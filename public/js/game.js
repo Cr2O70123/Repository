@@ -17,24 +17,28 @@ const App = {
         socket.emit('login', name);
     },
     nav(page) {
-            AudioSys.play('ui');
-    
-            // --- ★★★ 新增這一行：切換頁面時，強制關閉結算彈窗 ★★★ ---
-            document.getElementById('result-modal').classList.add('hidden');
-            document.querySelectorAll('.page').forEach(p => {
-                p.classList.remove('active');
-                p.classList.add('hidden');
-            });
-            const target = document.getElementById('page-'+page);
+        AudioSys.play('ui');
+
+        // ★★★ 強制關閉結算視窗 ★★★
+        const modal = document.getElementById('result-modal');
+        if(modal) modal.classList.add('hidden');
+
+        // 切換頁面
+        document.querySelectorAll('.page').forEach(p => {
+            p.classList.remove('active');
+            p.classList.add('hidden');
+        });
+        const target = document.getElementById('page-'+page);
+        if(target) {
             target.classList.remove('hidden');
             setTimeout(()=>target.classList.add('active'), 10);
-    
-            // 頁面初始化邏輯
-            if(page==='shop') this.renderShop();
-            if(page==='deck') this.renderDeck();
-            if(page==='leaderboard') this.renderLeaderboard();
-            if(page==='profile') this.renderProfile();
-        },
+        }
+
+        // 頁面初始化邏輯
+        if(page==='shop') this.renderShop();
+        if(page==='deck') this.renderDeck();
+        if(page==='leaderboard') this.renderLeaderboard();
+        if(page==='profile') this.renderProfile();
     },
     updateUI(user) {
         userData = user;
@@ -310,7 +314,7 @@ const Game = {
         requestAnimationFrame(() => this.loop());
         this.ctx.clearRect(0,0,this.width,this.height);
         
-        // --- 繪製地圖 (還原你的經典介面) ---
+        // --- 繪製地圖 ---
         this.ctx.fillStyle = CONFIG.COLORS.GRASS; this.ctx.fillRect(0,0,this.width,this.height);
         const ry = this.height * CONFIG.RIVER_OFF;
         this.ctx.fillStyle = CONFIG.COLORS.WATER; this.ctx.fillRect(0, ry-30, this.width, 60);
@@ -409,7 +413,6 @@ const Game = {
             const d=CARDS[k], el=document.createElement('div');
             el.className=`battle-card`; 
             if(this.dragIdx===i) el.classList.add('selected');
-            // 透過 Pointer Event 觸發
             el.onpointerdown = (e) => Game.onDown(e); 
             
             el.innerHTML=`<div class="cost">${d.cost}</div><div class="icon">${d.icon}</div>`;
