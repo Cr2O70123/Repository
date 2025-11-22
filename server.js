@@ -8,149 +8,150 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-// 設定靜態檔案
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- 簡易資料庫系統 ---
-const DB_PATH = path.join(__dirname, 'data', 'db.json');
-// 確保 data 資料夾存在
-if (!fs.existsSync(path.join(__dirname, 'data'))) fs.mkdirSync(path.join(__dirname, 'data'));
+// --- 簡易資料庫系統 (JSON File) ---
+const DATA_DIR = path.join(__dirname, 'data');
+const DB_PATH = path.join(DATA_DIR, 'db.json');
 
-// 讀取數據
-let database = { users: {} };
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+
+let db = { users: {} };
 if (fs.existsSync(DB_PATH)) {
-    try { database = JSON.parse(fs.readFileSync(DB_PATH, 'utf8')); } catch (e) { console.log("DB讀取錯誤，重置"); }
+    try { db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8')); } catch (e) { console.log("DB重置"); }
 }
 
-// 存檔函數
 function saveDB() {
-    fs.writeFileSync(DB_PATH, JSON.stringify(database, null, 2));
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
 }
 
-// 獲取或創建用戶
-function getUser(username) {
-    if (!database.users[username]) {
-        database.users[username] = {
-            name: username,
-            gold: 1000,
-            wins: 0,
-            loss: 0,
-            inventory: ['knight', 'archer', 'giant', 'fireball', 'musketeer', 'bats'], // 初始卡牌
-            deck: ['knight', 'archer', 'giant', 'fireball', 'musketeer', 'bats']
-        };
-        saveDB();
-    }
-    return database.users[username];
+// 初始玩家模板
+function createUser(name) {
+    return {
+        name: name,
+        gold: 1000,
+        wins: 0,
+        loss: 0,
+        lastLogin: null,
+        inventory: ['knight', 'archer', 'giant', 'fireball', 'musketeer', 'bats'],
+        deck: ['knight', 'archer', 'giant', 'fireball', 'musketeer', 'bats']
+    };
 }
 
-// --- 路由 ---
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// --- Socket.io 邏輯 ---
-let waitingSocket = null;
+// --- Socket 邏輯 ---
+let matchQueue = null; // 等待中的玩家 Socket
 
 io.on('connection', (socket) => {
     let currentUser = null;
 
-    // 1. 登入 (獲取數據)
+    // 1. 登入 / 註冊
     socket.on('login', (username) => {
-        if(!username) return;
-        currentUser = getUser(username);
-        socket.emit('user_data', currentUser);
-        updateLeaderboard(socket); // 發送排行榜
+        if (!username) return;
+        if (!db.users[username]) {
+            db.users[username] = createUser(username);
+            saveDB();
+        }
+        currentUser = db.users[username];
+        socket.userData = currentUser; // 綁定到 socket
+        socket.emit('login_success', currentUser);
+        updateLeaderboard(socket);
     });
 
     // 2. 購買卡牌
-    socket.on('buy_card', (cardId, price) => {
+    socket.on('buy_card', ({ cardId, price }) => {
         if (!currentUser) return;
-        const user = database.users[currentUser.name];
-        
-        if (user.gold >= price && !user.inventory.includes(cardId)) {
-            user.gold -= price;
-            user.inventory.push(cardId);
-            saveDB();
-            socket.emit('user_data', user); // 更新前端
-            socket.emit('msg', `購買成功！剩下 ${user.gold} 金幣`);
+        if (currentUser.inventory.includes(cardId)) return socket.emit('msg', '你已經擁有這張卡了！');
+        if (currentUser.gold < price) return socket.emit('msg', '金幣不足！快去對戰賺錢吧。');
+
+        currentUser.gold -= price;
+        currentUser.inventory.push(cardId);
+        saveDB();
+        socket.emit('update_user', currentUser);
+        socket.emit('msg', '購買成功！');
+    });
+
+    // 3. 保存牌組
+    socket.on('save_deck', (newDeck) => {
+        if (!currentUser || newDeck.length !== 6) return;
+        currentUser.deck = newDeck;
+        saveDB();
+        socket.emit('update_user', currentUser);
+        socket.emit('msg', '牌組已保存');
+    });
+
+    // 4. 每日簽到
+    socket.on('daily_checkin', () => {
+        if (!currentUser) return;
+        const today = new Date().toDateString();
+        if (currentUser.lastLogin === today) {
+            socket.emit('msg', '今天已經簽到過了，明天再來！');
         } else {
-            socket.emit('msg', '金幣不足或已擁有該卡牌');
-        }
-    });
-
-    // 3. 更新牌組
-    socket.on('update_deck', (newDeck) => {
-        if (!currentUser) return;
-        if (newDeck.length === 6) {
-            database.users[currentUser.name].deck = newDeck;
+            currentUser.lastLogin = today;
+            currentUser.gold += 200;
             saveDB();
-            socket.emit('user_data', database.users[currentUser.name]);
+            socket.emit('update_user', currentUser);
+            socket.emit('msg', '簽到成功！獲得 200 金幣');
         }
     });
 
-    // 4. 配對邏輯
+    // 5. 配對系統
     socket.on('find_match', () => {
         if (!currentUser) return;
-        if (waitingSocket && waitingSocket.id === socket.id) return;
+        
+        // 如果佇列中有別人
+        if (matchQueue && matchQueue.id !== socket.id) {
+            const opponent = matchQueue;
+            matchQueue = null;
 
-        if (waitingSocket) {
-            const roomID = waitingSocket.id + '#' + socket.id;
-            const opponent = waitingSocket;
-            waitingSocket = null;
-
+            const roomID = socket.id + '#' + opponent.id;
             socket.join(roomID);
             opponent.join(roomID);
 
-            // 分配對手資訊
-            const p1Data = database.users[socket.currentUser?.name];
-            const p2Data = database.users[opponent.currentUser?.name];
-
-            io.to(opponent.id).emit('game_start', { roomID, role: 'host', enemyName: p1Data?.name || "對手" });
-            io.to(socket.id).emit('game_start', { roomID, role: 'guest', enemyName: p2Data?.name || "對手" });
-
-            console.log(`配對成功: ${roomID}`);
+            // 開始遊戲：通知雙方 (Host = 紅方/上方, Guest = 藍方/下方)
+            // 這裡為了邏輯簡單，前端一律把自己視為 Player (藍)，對方視為 Enemy (紅)
+            // 所以我們只要告訴前端「對手名字」即可
+            
+            io.to(socket.id).emit('match_found', { roomID, role: 'host', enemyName: opponent.userData.name });
+            io.to(opponent.id).emit('match_found', { roomID, role: 'guest', enemyName: socket.userData.name });
         } else {
-            waitingSocket = socket;
-            socket.currentUser = currentUser; // 暫存一下以便配對時讀取名字
-            socket.emit('waiting', '正在尋找對手...');
+            matchQueue = socket;
+            socket.emit('waiting', '正在尋找實力相當的對手...');
         }
     });
 
-    // 5. 遊戲動作轉發
-    socket.on('action', (data) => {
-        if (data.roomID) socket.to(data.roomID).emit('remote_action', data);
+    // 6. 遊戲內動作轉發
+    socket.on('game_action', (data) => {
+        // data 包含: roomID, type (spawn/emote), card, x, y...
+        socket.to(data.roomID).emit('remote_action', data);
     });
 
-    // 6. 遊戲結算 (更新戰績與金幣)
-    socket.on('game_result', (result) => {
+    // 7. 結算
+    socket.on('game_end', (result) => { // result = 'win' | 'loss'
         if (!currentUser) return;
-        const user = database.users[currentUser.name];
         if (result === 'win') {
-            user.wins += 1;
-            user.gold += 100; // 勝場獎勵
+            currentUser.wins++;
+            currentUser.gold += 50;
         } else {
-            user.loss += 1;
-            user.gold += 20;  // 敗場獎勵
+            currentUser.loss++;
+            currentUser.gold += 10;
         }
         saveDB();
-        socket.emit('user_data', user);
-        updateLeaderboard(io); // 廣播更新後的排行榜給所有人
+        socket.emit('update_user', currentUser);
+        updateLeaderboard(io); // 廣播給所有人更新排行榜
     });
 
     socket.on('disconnect', () => {
-        if (waitingSocket === socket) waitingSocket = null;
+        if (matchQueue === socket) matchQueue = null;
     });
 });
 
-// 輔助：發送排行榜
 function updateLeaderboard(target) {
-    const sorted = Object.values(database.users)
-        .sort((a, b) => b.wins - a.wins) // 依勝場排序
-        .slice(0, 10) // 取前10名
-        .map(u => ({ name: u.name, wins: u.wins, rate: Math.round((u.wins/(u.wins+u.loss||1))*100) }));
-    
-    target.emit('leaderboard_data', sorted);
+    const list = Object.values(db.users)
+        .sort((a, b) => b.wins - a.wins)
+        .slice(0, 10)
+        .map(u => ({ name: u.name, wins: u.wins, gold: u.gold }));
+    target.emit('leaderboard_update', list);
 }
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server Running on Port ${PORT}`));
