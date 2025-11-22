@@ -1,32 +1,36 @@
-// --- 基礎工具 ---
+// --- 基礎工具類 (音效、向量、特效) ---
 const AudioSys={ctx:null,init:function(){window.AudioContext=window.AudioContext||window.webkitAudioContext;this.ctx=new AudioContext},play:function(t){if(!this.ctx)return;const e=this.ctx.currentTime,n=this.ctx.createOscillator(),o=this.ctx.createGain();o.connect(this.ctx.destination),n.connect(o),"spawn"===t?(n.frequency.setValueAtTime(300,e),n.frequency.exponentialRampToValueAtTime(50,e+.2),o.gain.setValueAtTime(.1,e),o.gain.exponentialRampToValueAtTime(.01,e+.2),n.start(),n.stop(e+.2)):"attack"===t?(n.type="triangle",n.frequency.setValueAtTime(150,e),n.frequency.linearRampToValueAtTime(100,e+.05),o.gain.setValueAtTime(.05,e),o.gain.linearRampToValueAtTime(0,e+.05),n.start(),n.stop(e+.05)):"ui"===t?(n.frequency.setValueAtTime(800,e),o.gain.setValueAtTime(.05,e),o.gain.exponentialRampToValueAtTime(.01,e+.1),n.start(),n.stop(e+.1))}};
 class Vector2 { constructor(x,y){this.x=x;this.y=y;} add(v){this.x+=v.x;this.y+=v.y;return this;} sub(v){this.x-=v.x;this.y-=v.y;return this;} mult(n){this.x*=n;this.y*=n;return this;} mag(){return Math.sqrt(this.x*this.x+this.y*this.y);} normalize(){let m=this.mag();if(m>0)this.mult(1/m);return this;} dist(v){return Math.hypot(this.x-v.x,this.y-v.y);} copy(){return new Vector2(this.x,this.y);}}
 class ParticlePool { constructor(){this.pool=[];this.maxSize=200;} get(x,y,color,type,val){let p=this.pool.find(p=>!p.active);if(!p){if(this.pool.length<this.maxSize){p=new Particle();this.pool.push(p);}else return null;}p.reset(x,y,color,type,val);return p;} updateAndDraw(ctx){this.pool.forEach(p=>{if(p.active){p.update();p.draw(ctx);}});} clear(){this.pool.forEach(p=>p.active=false);} }
 class Particle { constructor(){this.active=false;this.pos=new Vector2(0,0);this.vel=new Vector2(0,0);} reset(x,y,c,t,v){this.active=true;this.pos.x=x;this.pos.y=y;this.type=t;this.color=c;this.life=1.0; if(t==='text'||t==='crit'){this.text=v+(t==='crit'?"!":"");this.scale=t==='crit'?2.5:Math.min(2,0.8+v/200);this.vel=new Vector2((Math.random()-0.5),t==='crit'?-3:-2.5);this.decay=0.02;}else if(t==='spawn_flash'){this.vel=new Vector2(0,0);this.decay=0.08;this.size=10;}else if(t==='emote'){this.text=v;this.vel=new Vector2(0,-0.8);this.decay=0.01;this.life=2.5;}else{this.vel=new Vector2((Math.random()-0.5)*3,(Math.random()-0.5)*3);this.decay=0.05;this.size=Math.random()*4+2;}} update(){this.pos.add(this.vel);this.life-=this.decay;if(this.life<=0)this.active=false;if(this.type==='spawn_flash')this.size+=2;} draw(ctx){if(!this.active)return;ctx.globalAlpha=Math.max(0,this.life); if(this.type==='text'||this.type==='crit'||this.type==='emote'){ctx.font=this.type==='emote'?"30px sans-serif":"900 16px sans-serif";ctx.fillStyle=this.type==='emote'?'black':this.color;ctx.fillText(this.text,this.pos.x,this.pos.y);}else{ctx.fillStyle=this.type==='spawn_flash'?'#fff':this.color;ctx.beginPath();ctx.arc(this.pos.x,this.pos.y,this.size,0,Math.PI*2);ctx.fill();} ctx.globalAlpha=1;} }
 
-// --- 應用程式邏輯 (App) ---
+// --- App 邏輯 (介面與後端溝通) ---
 const socket = io();
 let userData = {};
 let leaderboard = [];
 
 const App = {
     login() {
-        const name = document.getElementById('username-input').value.trim();
-        if (!name) return alert("請輸入暱稱");
+        const name = document.getElementById('username').value.trim();
+        if(!name) return alert("請輸入暱稱");
         AudioSys.init();
         socket.emit('login', name);
     },
     nav(page) {
         AudioSys.play('ui');
-        document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.getElementById('page-' + page).classList.remove('hidden');
-        document.getElementById('page-' + page).classList.add('active');
-        
-        if (page === 'shop') this.renderShop();
-        if (page === 'deck') this.renderDeckEditor();
-        if (page === 'profile') this.renderProfile();
-        if (page === 'leaderboard') this.renderLeaderboard();
+        document.querySelectorAll('.page').forEach(p => {
+            p.classList.remove('active');
+            p.classList.add('hidden');
+        });
+        const target = document.getElementById('page-'+page);
+        target.classList.remove('hidden');
+        setTimeout(()=>target.classList.add('active'), 10);
+
+        // 頁面初始化邏輯
+        if(page==='shop') this.renderShop();
+        if(page==='deck') this.renderDeck();
+        if(page==='leaderboard') this.renderLeaderboard();
+        if(page==='profile') this.renderProfile();
     },
     updateUI(user) {
         userData = user;
@@ -34,87 +38,91 @@ const App = {
         document.getElementById('lobby-gold').innerText = user.gold;
         document.getElementById('shop-gold').innerText = user.gold;
     },
-    findMatch() {
-        document.getElementById('match-status').innerText = "尋找對手中...";
-        socket.emit('find_match');
-    },
-    // 渲染商店
+    showSettings() { alert("設定功能即將推出！"); },
+    dailyCheckIn() { socket.emit('daily_checkin'); },
+    
+    // 商店
     renderShop() {
-        const grid = document.getElementById('shop-grid'); grid.innerHTML = '';
+        const list = document.getElementById('shop-list'); list.innerHTML='';
         ALL_CARDS_KEYS.forEach(key => {
             const card = CARDS[key];
             const owned = userData.inventory.includes(key);
             const el = document.createElement('div');
-            el.className = `shop-item ${owned ? 'owned' : ''}`;
+            el.className = `shop-card ${owned?'owned':''}`;
             el.innerHTML = `
-                <div style="font-size:30px;">${card.icon}</div>
-                <div style="font-weight:bold; font-size:14px;">${card.name}</div>
-                <div class="price-tag">💰 ${card.price}</div>
-                <button class="btn btn-sec shop-btn" onclick="App.buy('${key}', ${card.price})">購買</button>
+                <div class="shop-icon">${card.icon}</div>
+                <div class="shop-name">${card.name}</div>
+                <div class="shop-price">💰 ${card.price}</div>
+                <button class="shop-btn" onclick="App.buy('${key}', ${card.price})">購買</button>
             `;
-            grid.appendChild(el);
+            list.appendChild(el);
         });
     },
-    buy(key, price) {
-        if (userData.gold >= price) socket.emit('buy_card', key, price);
-        else alert("金幣不足");
-    },
-    // 渲染牌組編輯
-    renderDeckEditor() {
-        const grid = document.getElementById('deck-grid'); grid.innerHTML = '';
+    buy(key, price) { socket.emit('buy_card', {cardId: key, price: price}); },
+
+    // 牌組
+    renderDeck() {
+        const row = document.getElementById('current-deck-row'); row.innerHTML='';
+        userData.deck.forEach(key => {
+            const el = document.createElement('div'); el.className='mini-deck-card';
+            el.innerHTML = CARDS[key].icon;
+            el.onclick = () => { userData.deck = userData.deck.filter(k=>k!==key); this.renderDeck(); };
+            row.appendChild(el);
+        });
+        
+        const col = document.getElementById('deck-collection'); col.innerHTML='';
         userData.inventory.forEach(key => {
+            if(userData.deck.includes(key)) return;
             const card = CARDS[key];
-            const inDeck = userData.deck.includes(key);
-            const el = document.createElement('div');
-            el.className = `card ${card.rarity} ${inDeck ? 'selected' : ''}`;
-            el.innerHTML = `<div class="cost">${card.cost}</div><div class="card-inner"><div class="emoji">${card.icon}</div></div>`;
-            el.onclick = () => {
-                if (inDeck) {
-                    if (userData.deck.length > 1) userData.deck = userData.deck.filter(k => k !== key);
-                } else {
-                    if (userData.deck.length < 6) userData.deck.push(key);
-                }
-                this.renderDeckEditor();
+            const el = document.createElement('div'); el.className='shop-card';
+            el.innerHTML = `<div class="shop-icon">${card.icon}</div><div class="shop-name">${card.name}</div>`;
+            el.onclick = () => { 
+                if(userData.deck.length<6) { userData.deck.push(key); this.renderDeck(); }
             };
-            grid.appendChild(el);
+            col.appendChild(el);
         });
     },
-    saveDeck() {
-        if (userData.deck.length !== 6) return alert("牌組必須剛好 6 張");
-        socket.emit('update_deck', userData.deck);
-        this.nav('lobby');
+    saveDeck() { socket.emit('save_deck', userData.deck); this.nav('lobby'); },
+
+    // 排行榜與個人
+    renderLeaderboard() {
+        const list = document.getElementById('leaderboard-list'); list.innerHTML='';
+        leaderboard.forEach((u,i) => {
+            list.innerHTML += `<tr><td class="rank-${i+1}">#${i+1}</td><td>${u.name}</td><td>${u.wins}</td><td>${u.gold}</td></tr>`;
+        });
     },
     renderProfile() {
         document.getElementById('p-name').innerText = userData.name;
         document.getElementById('p-wins').innerText = userData.wins;
         document.getElementById('p-loss').innerText = userData.loss;
-        const total = userData.wins + userData.loss;
-        document.getElementById('p-rate').innerText = total > 0 ? Math.round((userData.wins / total) * 100) + '%' : '0%';
+        const total = userData.wins+userData.loss;
+        document.getElementById('p-rate').innerText = total>0 ? Math.round((userData.wins/total)*100)+"%" : "0%";
     },
-    renderLeaderboard() {
-        const list = document.getElementById('rank-list'); list.innerHTML = '';
-        leaderboard.forEach((u, i) => {
-            const row = `<tr><td>#${i + 1}</td><td>${u.name}</td><td>${u.wins}</td><td>${u.rate}%</td></tr>`;
-            list.innerHTML += row;
-        });
+
+    // 對戰
+    findMatch() {
+        document.getElementById('match-status').innerText = "尋找對手中...";
+        socket.emit('find_match');
     }
 };
 
-// Socket 監聽
-socket.on('user_data', (user) => { App.updateUI(user); if(document.getElementById('page-login').classList.contains('active')) App.nav('lobby'); });
-socket.on('leaderboard_data', (data) => { leaderboard = data; });
-socket.on('msg', (msg) => alert(msg));
+// --- Socket Event Listeners ---
+socket.on('login_success', (user) => { App.updateUI(user); App.nav('lobby'); });
+socket.on('update_user', (user) => App.updateUI(user));
+socket.on('msg', (txt) => alert(txt));
 socket.on('waiting', (msg) => document.getElementById('match-status').innerText = msg);
-socket.on('game_start', (data) => {
-    Game.initAndStart(data.roomID, data.role, data.enemyName, userData.deck);
+socket.on('leaderboard_update', (data) => leaderboard = data);
+socket.on('match_found', (data) => {
     App.nav('game');
+    Game.initAndStart(data.roomID, data.enemyName, userData.deck);
 });
 socket.on('remote_action', (data) => {
-    if (data.type === 'spawn') Game.spawn(data.card, (1 - data.nx) * Game.width, (1 - data.ny) * Game.height, 'enemy');
-    if (data.type === 'emote') Game.showEmote(data.val, 'enemy');
+    if(data.type==='spawn') Game.spawn(data.card, (1-data.nx)*Game.width, (1-data.ny)*Game.height, 'enemy');
+    if(data.type==='emote') Game.showEmote(data.val, 'enemy');
 });
 
-// --- 遊戲引擎 (Game) ---
+
+// --- Game Engine (Canvas Logic) ---
 class Entity {
     constructor(x, y, team, radius) { this.pos=new Vector2(x,y); this.team=team; this.radius=radius; this.dead=false; this.hp=100; this.maxHp=100; this.flash=0; }
     takeDamage(amt, isCrit=false) {
@@ -257,27 +265,30 @@ const Game = {
     units: [], towers: [], projectiles: [], particles: new ParticlePool(),
     elixir: 5, deck: [], hand: [], nextCard: null, dragIdx: null, dragPos: {x:0,y:0}, isDragging: false,
 
-    initAndStart(roomID, role, enemyName, userDeck) {
+    initAndStart(roomID, enemyName, userDeck) {
         this.canvas = document.getElementById('gameCanvas'); this.ctx = this.canvas.getContext('2d');
-        const wrapper = document.getElementById('canvas-wrapper');
+        const wrapper = document.getElementById('game-ui-wrapper');
         this.width = wrapper.clientWidth; this.height = wrapper.clientHeight;
         this.canvas.width = this.width; this.canvas.height = this.height;
-        document.getElementById('enemy-name-txt').innerText = enemyName;
+        document.getElementById('enemy-name').innerText = enemyName;
 
         this.roomID = roomID; this.running = true;
         this.reset(userDeck);
         
-        // Timer
         let time = CONFIG.GAME_TIME;
         this.timerInt = setInterval(() => {
             if(!this.running) return clearInterval(this.timerInt);
             time--; const m = Math.floor(time/60), s = time%60;
             document.getElementById('timer').innerText = `0${m}:${s<10?'0'+s:s}`;
+            if(time===60) {
+                const e = document.getElementById('elixir-mode-msg'); e.style.opacity=1; e.style.transform='scale(1.2)';
+                setTimeout(()=>{e.style.opacity=0;}, 2000);
+            }
             if(time<=0) this.endGame(null);
         }, 1000);
 
-        // Input
-        const c = document.getElementById('game-container');
+        // Events
+        const c = document.getElementById('gameCanvas');
         c.onpointerdown = e => this.onDown(e); c.onpointermove = e => this.onMove(e); c.onpointerup = e => this.onUp(e);
         this.loop();
     },
@@ -295,93 +306,129 @@ const Game = {
         requestAnimationFrame(() => this.loop());
         this.ctx.clearRect(0,0,this.width,this.height);
         
-        // Map
+        // --- 繪製地圖 (還原你的經典介面) ---
         this.ctx.fillStyle = CONFIG.COLORS.GRASS; this.ctx.fillRect(0,0,this.width,this.height);
         const ry = this.height * CONFIG.RIVER_OFF;
         this.ctx.fillStyle = CONFIG.COLORS.WATER; this.ctx.fillRect(0, ry-30, this.width, 60);
         this.ctx.fillStyle = '#636e72'; [0.25, 0.75].forEach(r => this.ctx.fillRect(this.width*r-30, ry-35, 60, 70));
-
+        
+        // 邏輯
         this.elixir = Math.min(10, this.elixir + CONFIG.ELIXIR_RATE); this.renderElixir();
         [...this.units, ...this.towers, ...this.projectiles].forEach(e => e.update());
         this.particles.updateAndDraw(this.ctx);
         this.units = this.units.filter(u=>!u.dead); this.towers = this.towers.filter(t=>!t.dead); this.projectiles = this.projectiles.filter(p=>!p.dead);
         
-        // Draw
+        // 繪製
         [...this.towers, ...this.units].sort((a,b)=>a.pos.y-b.pos.y).forEach(e => e.draw(this.ctx));
         this.projectiles.forEach(p => p.draw(this.ctx));
 
-        // Drag Visual
+        // 拖曳視覺
         if(this.isDragging) {
             const d = CARDS[this.hand[this.dragIdx]];
             const valid = d.type==='spell' || this.dragPos.y > this.height * CONFIG.RIVER_OFF;
             this.ctx.save(); this.ctx.translate(this.dragPos.x, this.dragPos.y);
             this.ctx.globalAlpha=0.5; this.ctx.fillStyle=valid?'#3498db':'#e74c3c';
-            this.ctx.beginPath(); this.ctx.arc(0,0,30,0,Math.PI*2); this.ctx.fill();
+            this.ctx.beginPath(); this.ctx.arc(0,0,d.radius*1.5,0,Math.PI*2); this.ctx.fill();
             this.ctx.font="30px serif"; this.ctx.fillText(d.icon, -15, 10);
             this.ctx.restore();
         }
 
-        // Win Condition
         const pk = this.towers.find(t=>t.team==='player' && t.isKing);
         const ek = this.towers.find(t=>t.team==='enemy' && t.isKing);
         if(!pk) this.endGame(false); if(!ek) this.endGame(true);
     },
+    
+    // 輸入處理
+    onDown(e) {
+        if(!this.running) return;
+        const els = document.querySelectorAll('.battle-card');
+        const rect = this.canvas.getBoundingClientRect();
+        // 檢查是否點擊卡牌
+        let clickedCard = false;
+        els.forEach((el, i) => {
+            const box = el.getBoundingClientRect();
+            if(e.clientX >= box.left && e.clientX <= box.right && e.clientY >= box.top && e.clientY <= box.bottom) {
+                if(this.elixir >= CARDS[this.hand[i]].cost) { 
+                    this.dragIdx = i; this.isDragging = true; 
+                    this.dragPos = {x: e.clientX-rect.left, y: e.clientY-rect.top}; 
+                    this.renderHand();
+                    clickedCard = true;
+                }
+            }
+        });
+        if(!clickedCard && this.isDragging) { /* update drag pos */ }
+    },
+    onMove(e) { 
+        if(this.isDragging) { 
+            const r = this.canvas.getBoundingClientRect(); 
+            this.dragPos = {x:e.clientX-r.left, y:e.clientY-r.top}; 
+        } 
+    },
+    onUp(e) {
+        if(this.isDragging) {
+            const r = this.canvas.getBoundingClientRect(), y = e.clientY-r.top;
+            const key = this.hand[this.dragIdx];
+            // 判定是否放置成功 (河流下方或法術)
+            if(CARDS[key].type==='spell' || y > this.height * CONFIG.RIVER_OFF) {
+                this.elixir -= CARDS[key].cost;
+                this.spawn(key, this.dragPos.x, this.dragPos.y, 'player');
+                socket.emit('game_action', { roomID: this.roomID, type: 'spawn', card: key, nx: this.dragPos.x/this.width, ny: this.dragPos.y/this.height });
+                this.hand[this.dragIdx] = this.nextCard; 
+                this.nextCard = this.deck.length>0?this.deck.pop():userData.deck[Math.floor(Math.random()*6)];
+            }
+            this.isDragging = false; this.dragIdx = null; this.renderHand();
+        }
+    },
+
     spawn(key, x, y, team) {
         const d = CARDS[key]; AudioSys.play('spawn');
         if(d.type==='spell') Game.projectiles.push(new Projectile(new Vector2(this.width/2, team==='player'?this.height:0), new Vector2(x,y), d.dmg, d.aoe, key, team));
         else { const c = d.count || 1; for(let i=0; i<c; i++) this.units.push(new Unit(x+(i-(c-1)/2)*15, y, team, key)); }
     },
-    onDown(e) {
-        if(!this.running) return;
-        const rect = this.canvas.getBoundingClientRect(), x = e.clientX-rect.left, y = e.clientY-rect.top;
-        const els = document.querySelectorAll('#hand-cards .card');
-        els.forEach((el, i) => {
-            const box = el.getBoundingClientRect();
-            if(e.clientX>=box.left && e.clientX<=box.right && e.clientY>=box.top && e.clientY<=box.bottom) {
-                if(this.elixir >= CARDS[this.hand[i]].cost) { this.dragIdx = i; this.isDragging = true; this.dragPos = {x, y}; this.renderHand(); }
-            }
-        });
-    },
-    onMove(e) { if(this.isDragging) { const r = this.canvas.getBoundingClientRect(); this.dragPos = {x:e.clientX-r.left, y:e.clientY-r.top}; } },
-    onUp(e) {
-        if(this.isDragging) {
-            const r = this.canvas.getBoundingClientRect(), y = e.clientY-r.top;
-            const key = this.hand[this.dragIdx];
-            if(CARDS[key].type==='spell' || y > this.height * CONFIG.RIVER_OFF) {
-                this.elixir -= CARDS[key].cost;
-                this.spawn(key, this.dragPos.x, this.dragPos.y, 'player');
-                socket.emit('action', { roomID: this.roomID, type: 'spawn', card: key, nx: this.dragPos.x/this.width, ny: this.dragPos.y/this.height });
-                this.hand[this.dragIdx] = this.nextCard; this.nextCard = this.deck.length>0?this.deck.pop():userData.deck[Math.floor(Math.random()*6)];
-            }
-            this.isDragging = false; this.dragIdx = null; this.renderHand();
-        }
-    },
+    sendEmote(v) { this.showEmote(v, 'player'); socket.emit('game_action', { roomID: this.roomID, type: 'emote', val: v }); document.getElementById('emote-box').classList.remove('show'); },
+    showEmote(v, team) { const t = this.towers.find(t => t.team === team && t.isKing); if(t) Game.particles.get(t.pos.x, t.pos.y-60, null, 'emote', v); },
+    surrender() { if(confirm("確定投降？")) this.endGame(false); },
+    
     renderElixir() {
         document.getElementById('elixir-fill').style.width = (this.elixir*10)+'%';
-        document.getElementById('elixir-badge').innerText = Math.floor(this.elixir);
-        document.querySelectorAll('#hand-cards .card').forEach((el, i)=>{ if(this.hand[i]) el.classList.toggle('disabled', this.elixir < CARDS[this.hand[i]].cost); });
+        document.getElementById('elixir-num').innerText = Math.floor(this.elixir);
+        document.querySelectorAll('.battle-card').forEach((el, i)=>{ 
+            if(this.hand[i]) {
+                const tooExpensive = this.elixir < CARDS[this.hand[i]].cost;
+                el.classList.toggle('disabled', tooExpensive);
+            }
+        });
     },
     renderHand() {
         const c = document.getElementById('hand-cards'); c.innerHTML='';
         this.hand.forEach((k,i)=>{
             const d=CARDS[k], el=document.createElement('div');
-            el.className=`card ${d.rarity}`; if(this.dragIdx===i) el.classList.add('selected');
-            el.innerHTML=`<div class="cost">${d.cost}</div><div class="card-inner"><div class="emoji">${d.icon}</div></div>`;
+            el.className=`battle-card`; 
+            if(this.dragIdx===i) el.classList.add('selected');
+            // 透過 Pointer Event 觸發
+            el.onpointerdown = (e) => Game.onDown(e); 
+            
+            el.innerHTML=`<div class="cost">${d.cost}</div><div class="icon">${d.icon}</div>`;
             c.appendChild(el);
         });
-        document.getElementById('next-icon').innerText = CARDS[this.nextCard].icon;
+        document.getElementById('next-card-icon').innerText = CARDS[this.nextCard].icon;
         this.renderElixir();
     },
-    triggerEmote(v) { this.showEmote(v, 'player'); socket.emit('action', { roomID: this.roomID, type: 'emote', val: v }); document.getElementById('emote-menu').classList.remove('open'); },
-    showEmote(v, team) { const t = this.towers.find(t => t.team === team && t.isKing); if(t) Game.particles.get(t.pos.x, t.pos.y-60, null, 'emote', v); },
+
     endGame(win) {
         this.running = false; clearInterval(this.timerInt);
         if(win===null) { const p=this.towers.filter(t=>t.team==='player').reduce((a,b)=>a+b.hp,0), e=this.towers.filter(t=>t.team==='enemy').reduce((a,b)=>a+b.hp,0); win=p>=e; }
-        const reward = win ? 100 : 20;
-        socket.emit('game_result', win ? 'win' : 'loss');
-        document.getElementById('end-title').innerText = win ? "勝利" : "失敗";
-        document.getElementById('end-title').style.color = win ? "#f1c40f" : "#e74c3c";
-        document.getElementById('reward-gold').innerText = reward;
-        App.nav('result');
+        
+        socket.emit('game_end', win ? 'win' : 'loss');
+        
+        const modal = document.getElementById('result-modal');
+        const title = document.getElementById('result-title');
+        const reward = document.getElementById('result-reward');
+        
+        title.innerText = win ? "VICTORY" : "DEFEAT";
+        title.style.color = win ? "#f1c40f" : "#e74c3c";
+        reward.innerText = win ? "金幣 +50" : "金幣 +10";
+        
+        modal.classList.remove('hidden');
     }
 };

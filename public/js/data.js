@@ -1,6 +1,9 @@
 const CONFIG = {
-    ELIXIR_RATE: 0.018, MAX_ELIXIR: 10, GAME_TIME: 180, DBL_ELIXIR: 60,
-    RIVER_OFF: 0.5, 
+    ELIXIR_RATE: 0.02, // 聖水回復速度
+    MAX_ELIXIR: 10,
+    GAME_TIME: 180,
+    DBL_ELIXIR: 60,
+    RIVER_OFF: 0.5,
     COLORS: { P: '#3498db', E: '#e74c3c', GRASS: '#27ae60', WATER: '#48dbfb' }
 };
 
@@ -15,6 +18,6 @@ const CARDS = {
     minipekka: { name: '小皮卡', price: 200, cost: 4, count: 1, hp: 1100, dmg: 550, speed: 0.55, range: 0, atkSpd: 95, type: 'ground', target: 'any', icon: '🤖', radius: 16, mass: 5.0, deployTime: 60, rarity: 'rare' },
     babydragon: { name: '飛龍', price: 500, cost: 4, count: 1, hp: 1000, dmg: 130, speed: 0.45, range: 90, atkSpd: 80, type: 'air', target: 'any', icon: '🐲', aoe: 50, radius: 16, mass: 4.0, deployTime: 60, rarity: 'epic' },
     fireball: { name: '火球', price: 200, cost: 4, count: 1, hp: 0, dmg: 350, speed: 0, range: 0, atkSpd: 0, type: 'spell', target: 'any', icon: '🔥', aoe: 110, knockback: 8, rarity: 'rare' },
-    golem: { name: '石頭人', price: 1000, cost: 8, count: 1, hp: 4500, dmg: 280, speed: 0.15, range: 0, atkSpd: 140, type: 'ground', target: 'building', icon: '🗿', radius: 32, mass: 50.0, deployTime: 180, rarity: 'legendary' }
+    golem: { name: '石頭人', price: 1000, cost: 8, count: 1, hp: 4500, dmg: 280, speed: 0.15, range: 0, atkSpd: 140, type: 'ground', target: 'building', icon: '🗿', radius: 32, mass: 50.0, deployTime: 180, deathDmg: 300, rarity: 'legendary' }
 };
 const ALL_CARDS_KEYS = Object.keys(CARDS);
