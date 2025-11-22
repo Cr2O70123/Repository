@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>迷你皇室戰爭 2.0</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+    <!-- 頁面 1：大廳 (Lobby) -->
+    <div id="page-lobby" class="page active">
+        <div class="header">
+            <div class="currency-bar">💰 <span id="gold-display">0</span></div>
+            <div class="profile-btn" onclick="App.nav('profile')">👤</div>
+        </div>
+        
+        <div class="title-group">
+            <h1>CLASH<br>ONLINE</h1>
+            <div class="subtitle">榮耀戰場</div>
+        </div>
+
+        <div class="main-menu">
+            <input type="text" id="nickname" class="input-box" placeholder="輸入暱稱" maxlength="8">
+            
+            <div class="match-status-box">
+                <div class="spinner" id="wait-spinner"></div>
+                <div id="match-status-txt">準備就緒</div>
+            </div>
+
+            <button class="btn btn-lg" id="btn-battle" onclick="Game.findMatch()">開始對戰</button>
+            
+            <div class="grid-menu">
+                <button class="btn btn-sec" onclick="Game.openDeckEditor()">編輯牌組</button>
+                <button class="btn btn-sec" onclick="App.nav('shop')">卡牌商店</button>
+                <button class="btn btn-sec" onclick="App.nav('leaderboard')">排行榜</button>
+                <button class="btn btn-sec" onclick="App.checkIn()">每日簽到</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 頁面 2：商店 (Shop) -->
+    <div id="page-shop" class="page hidden">
+        <div class="panel full-panel">
+            <h2>🛒 表情與卡牌商店</h2>
+            <div class="currency-bar">💰 <span id="shop-gold">0</span></div>
+            <div id="shop-grid" class="scroll-content"></div>
+            <button class="btn btn-back" onclick="App.nav('lobby')">返回大廳</button>
+        </div>
+    </div>
+
+    <!-- 頁面 3：排行榜 (Leaderboard) -->
+    <div id="page-leaderboard" class="page hidden">
+        <div class="panel full-panel">
+            <h2>🏆 榮耀排行榜</h2>
+            <div id="leaderboard-list" class="scroll-content">
+                <!-- JS 生成 -->
+            </div>
+            <button class="btn btn-back" onclick="App.nav('lobby')">返回大廳</button>
+        </div>
+    </div>
+
+    <!-- 頁面 4：個人檔案 (Profile) -->
+    <div id="page-profile" class="page hidden">
+        <div class="panel full-panel">
+            <h2>個人戰績</h2>
+            <div class="profile-stats">
+                <p>暱稱: <span id="p-name"></span></p>
+                <p>勝場: <span id="p-wins">0</span></p>
+                <p>敗場: <span id="p-loss">0</span></p>
+                <p>勝率: <span id="p-rate">0%</span></p>
+            </div>
+            <button class="btn btn-back" onclick="App.nav('lobby')">返回大廳</button>
+        </div>
+    </div>
+
+    <!-- 頁面 5：編輯牌組 (Editor) -->
+    <div id="page-editor" class="page overlay hidden">
+        <div class="panel">
+            <h2>配置牌組 (6張)</h2>
+            <div id="editor-grid" class="grid-4"></div>
+            <div id="editor-desc" class="desc-box">點擊卡牌查看詳情</div>
+            <button class="btn" onclick="App.closeEditor()">保存並返回</button>
+        </div>
+    </div>
+
+    <!-- 頁面 6：遊戲戰鬥 (Game) -->
+    <div id="page-game" class="page hidden">
+        <div id="canvas-wrapper">
+            <canvas id="gameCanvas"></canvas>
+            
+            <div id="hud-top">
+                <div class="hud-left">
+                    <div id="enemy-info">⚔️ <span id="enemy-name-txt">...</span></div>
+                </div>
+                <div id="timer-box">03:00</div>
+                <div class="hud-right">
+                    <button class="btn-surrender" onclick="Game.surrender()">🏳️</button>
+                </div>
+            </div>
+
+            <div id="emote-wrapper">
+                <div id="emote-menu"></div>
+                <div id="emote-btn" onclick="document.getElementById('emote-menu').classList.toggle('open')">💬</div>
+            </div>
+
+            <div id="elixir-mode-txt">雙倍聖水時刻!</div>
+            <div id="message"></div>
+        </div>
+
+        <div id="ui-layer">
+            <div id="elixir-area">
+                <div id="elixir-badge">5</div>
+                <div id="elixir-bar-bg"><div id="elixir-fill"></div></div>
+            </div>
+            <div id="deck-area">
+                <div id="next-slot">
+                    <span class="slot-label">下張</span>
+                    <div class="card disabled preview-card">
+                        <div class="card-inner"><div class="emoji" id="next-icon">?</div></div>
+                    </div>
+                </div>
+                <div id="hand-cards"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 結算畫面 -->
+    <div id="end-screen" class="page overlay hidden">
+        <h1 id="end-title" style="font-size:60px;">勝利</h1>
+        <div style="text-align:center; margin-bottom:20px; color:#ffd700; font-size:20px;">獲得金幣: <span id="reward-gold">0</span></div>
+        <button class="btn" onclick="location.reload()">返回大廳</button>
+    </div>
+
+    <!-- 載入順序很重要 -->
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>
