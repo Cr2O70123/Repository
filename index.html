@@ -3,98 +3,354 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>迷你皇室戰爭 - 終極連線版</title>
+<title>迷你皇室戰爭 - 經典連線版</title>
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
 <style>
+/* --- 1. 原始配色與變數還原 --- */
 :root {
-    --primary: #3498db; --accent: #f1c40f; --danger: #e74c3c;
-    --dark-bg: #1e272e; --ui-glass: rgba(30, 39, 46, 0.95);
-    --font-main: "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
-    --common: #bdc3c7; --rare: #f39c12; --epic: #9b59b6; --legendary: #00cec9;
+    --primary: #3498db;
+    --accent: #f1c40f;
+    --danger: #e74c3c;
+    --dark-bg: #1e272e;
+    --ui-glass: rgba(30, 39, 46, 0.95); /* 原始深色玻璃 */
+    --font-main: "PingFang TC", "Microsoft JhengHei", "Heiti TC", system-ui, sans-serif;
+    /* Rarity Colors */
+    --common: #bdc3c7;
+    --rare: #f39c12;
+    --epic: #9b59b6;
+    --legendary: #00cec9;
 }
 
 body {
-    margin: 0; padding: 0; background-color: #000; font-family: var(--font-main);
-    overflow: hidden; width: 100%; height: 100%; user-select: none;
-    -webkit-user-select: none; touch-action: none; position: fixed; color: white;
+    margin: 0; padding: 0;
+    background-color: #000;
+    font-family: var(--font-main);
+    overflow: hidden;
+    width: 100%; height: 100%;
+    user-select: none; -webkit-user-select: none;
+    touch-action: none;
+    position: fixed;
+    color: white;
 }
 
-#game-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; }
-#canvas-wrapper { position: relative; flex: 1; width: 100%; background: #2c3e50; overflow: hidden; box-shadow: inset 0 -20px 50px rgba(0,0,0,0.5); }
+#game-container {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+}
+
+#canvas-wrapper {
+    position: relative;
+    flex: 1; width: 100%;
+    background: #2c3e50; /* 原始背景色 */
+    overflow: hidden;
+    box-shadow: inset 0 -20px 50px rgba(0,0,0,0.5);
+}
+
 canvas { display: block; width: 100%; height: 100%; }
 
-/* --- UI 樣式 --- */
+/* --- UI 樣式 (還原原始按鈕與面板) --- */
 .btn {
-    background: linear-gradient(180deg, #3498db, #2980b9); border: none; border-radius: 16px;
-    padding: 14px 40px; color: white; font-size: 20px; font-weight: 800;
-    box-shadow: 0 6px 0 #1c5980, 0 10px 10px rgba(0,0,0,0.3); cursor: pointer;
-    min-width: 160px; margin: 5px; position: relative; overflow: hidden;
+    background: linear-gradient(180deg, #3498db, #2980b9);
+    border: none; border-radius: 16px;
+    padding: 14px 40px;
+    color: white; font-size: 20px; font-weight: 800;
+    box-shadow: 0 6px 0 #1c5980, 0 10px 10px rgba(0,0,0,0.3);
+    cursor: pointer; transition: all 0.1s;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.2);
+    min-width: 160px; margin: 5px;
+    position: relative; overflow: hidden;
 }
+.btn::after {
+    content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    animation: shine 3s infinite;
+}
+@keyframes shine { 0% { left: -100%; } 20% { left: 100%; } 100% { left: 100%; } }
 .btn:active { transform: translateY(4px); box-shadow: 0 0 0 #1c5980; }
-.btn-secondary { background: linear-gradient(180deg, #95a5a6, #7f8c8d); box-shadow: 0 6px 0 #566161; font-size: 16px; padding: 12px 30px; }
+
+.btn-secondary {
+    background: linear-gradient(180deg, #95a5a6, #7f8c8d);
+    box-shadow: 0 6px 0 #566161, 0 10px 10px rgba(0,0,0,0.3);
+    font-size: 16px; padding: 12px 30px;
+}
 .btn-secondary:active { transform: translateY(4px); box-shadow: 0 0 0 #566161; }
-.panel { background: var(--ui-glass); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 20px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
 
-/* --- HUD --- */
-#ui-layer { height: 160px; background: var(--ui-glass); backdrop-filter: blur(15px); border-top: 1px solid rgba(255,255,255,0.15); display: flex; flex-direction: column; padding: 5px 10px 10px 10px; box-sizing: border-box; z-index: 20; position: relative; }
-#elixir-area { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; padding: 0 5px; height: 30px; }
-#elixir-badge { width: 30px; height: 30px; background: linear-gradient(135deg, #a55eea, #8854d0); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 16px; border: 2px solid #fff; z-index: 2; }
-#elixir-bar-bg { flex: 1; height: 12px; background: rgba(0,0,0,0.8); border-radius: 10px; overflow: hidden; border: 2px solid #57606f; }
-#elixir-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #a55eea, #d980fa); transition: width 0.1s linear; }
-#deck-area { display: flex; align-items: flex-end; gap: 8px; height: 100%; flex: 1; width: 100%; }
-#next-slot { display: flex; flex-direction: column; align-items: center; opacity: 0.7; margin-right: 4px; background: rgba(0,0,0,0.3); border-radius: 10px; padding: 4px; width: 45px; flex-shrink: 0; }
-#hand-cards { display: flex; gap: 6px; justify-content: space-between; flex: 1; height: 100%; }
-.card { flex: 1; max-width: 85px; height: 90%; background: linear-gradient(160deg, #3d4c53, #2c3e50); border-radius: 10px; position: relative; cursor: pointer; border: 2px solid #57606f; overflow: hidden; }
-.card.selected { transform: translateY(-12px); border-width: 3px; box-shadow: 0 0 20px rgba(255, 255, 255, 0.4); background: linear-gradient(160deg, #576574, #3d4c53); z-index: 10; }
-.card.disabled { filter: grayscale(1) brightness(0.5); pointer-events: none; }
-.card.dragging { opacity: 0.3; transform: scale(0.9); }
-.cost { position: absolute; top: -1px; left: -1px; width: 20px; height: 20px; background: #fff; color: #8854d0; border-bottom-right-radius: 10px; font-weight: 900; font-size: 12px; display: flex; align-items: center; justify-content: center; z-index: 2; border: 2px solid #8854d0; }
-.card-inner { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 10px; }
-.emoji { font-size: 28px; margin-bottom: 2px; }
-.name { font-size: 10px; font-weight: 700; color: #fff; white-space: nowrap; transform: scale(0.9); }
-.card.common { border-color: var(--common); } .card.rare { border-color: var(--rare); } .card.epic { border-color: var(--epic); } .card.legendary { border-color: var(--legendary); }
-
-/* Top HUD */
-#hud-top { position: absolute; top: 0; left: 0; width: 100%; padding: 10px 15px; display: flex; justify-content: center; pointer-events: none; z-index: 15; box-sizing: border-box; }
-#timer-box { background: rgba(0,0,0,0.6); padding: 5px 15px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); }
-#timer { font-size: 24px; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
-#enemy-name-display {
-    position: absolute; top: 15px; left: 15px; 
-    background: rgba(231, 76, 60, 0.8); padding: 5px 12px; border-radius: 8px;
-    color: #fff; font-weight: bold; font-size: 14px; border: 1px solid #fff;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+.panel {
+    background: var(--ui-glass);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 24px;
+    padding: 20px;
+    display: flex; flex-direction: column; align-items: center;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
 }
 
-/* Emotes & Overlay */
-#emote-wrapper { position: absolute; bottom: 170px; left: 15px; z-index: 30; display: flex; flex-direction: column-reverse; gap: 10px; }
-#emote-btn { width: 44px; height: 44px; background: rgba(0,0,0,0.6); border: 2px solid #fff; border-radius: 50%; font-size: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: auto; }
-#emote-menu { background: rgba(0,0,0,0.8); border-radius: 12px; padding: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; opacity: 0; pointer-events: none; transform: scale(0.8) translateY(20px); transition: all 0.2s; }
-#emote-menu.open { opacity: 1; pointer-events: auto; transform: scale(1) translateY(0); }
-.emote-opt { font-size: 28px; cursor: pointer; }
+/* --- 底部操作區 (還原原始佈局) --- */
+#ui-layer {
+    height: 160px;
+    background: var(--ui-glass);
+    backdrop-filter: blur(15px);
+    border-top: 1px solid rgba(255,255,255,0.15);
+    display: flex; flex-direction: column;
+    padding: 5px 10px 10px 10px;
+    box-sizing: border-box;
+    z-index: 20; position: relative;
+}
 
-.overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; transition: opacity 0.3s; }
+#elixir-area {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 5px; padding: 0 5px;
+    height: 30px;
+}
+#elixir-badge {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, #a55eea, #8854d0);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 16px;
+    box-shadow: 0 0 15px rgba(165, 94, 234, 0.6);
+    border: 2px solid #fff; z-index: 2;
+}
+#elixir-bar-bg {
+    flex: 1; height: 12px;
+    background: rgba(0,0,0,0.8);
+    border-radius: 10px; overflow: hidden; position: relative;
+    border: 2px solid #57606f;
+}
+#elixir-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #a55eea, #d980fa);
+    box-shadow: 0 0 20px #a55eea;
+    transition: width 0.1s linear;
+}
+
+#deck-area {
+    display: flex; align-items: flex-end;
+    gap: 8px; height: 100%; flex: 1;
+    width: 100%;
+}
+
+#next-slot {
+    display: flex; flex-direction: column; align-items: center;
+    opacity: 0.7; margin-right: 4px;
+    background: rgba(0,0,0,0.3); border-radius: 10px; padding: 4px;
+    width: 45px; flex-shrink: 0;
+}
+.slot-label { font-size: 9px; color: #aaa; font-weight: 800; margin-bottom: 2px; }
+
+#hand-cards {
+    display: flex; gap: 6px; justify-content: space-between;
+    flex: 1; height: 100%;
+}
+
+.card {
+    flex: 1; max-width: 85px; height: 90%;
+    background: linear-gradient(160deg, #3d4c53, #2c3e50);
+    border-radius: 10px; position: relative;
+    cursor: pointer;
+    transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: 2px solid #57606f;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.3);
+    overflow: hidden; user-select: none;
+}
+
+.card.common { border-color: var(--common); }
+.card.rare { border-color: var(--rare); box-shadow: 0 4px 0 rgba(243, 156, 18, 0.3); }
+.card.epic { border-color: var(--epic); box-shadow: 0 4px 0 rgba(155, 89, 182, 0.3); }
+.card.legendary { border-color: var(--legendary); box-shadow: 0 4px 0 rgba(0, 206, 201, 0.3); animation: legendPulse 3s infinite; }
+
+@keyframes legendPulse { 0% { box-shadow: 0 0 5px var(--legendary); } 50% { box-shadow: 0 0 15px var(--legendary); } 100% { box-shadow: 0 0 5px var(--legendary); } }
+
+.card-inner {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding-top: 10px;
+    background: radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 70%);
+}
+.card:active { transform: scale(0.95); }
+.card.dragging { opacity: 0.3; transform: scale(0.9); }
+.card.selected {
+    transform: translateY(-12px);
+    border-width: 3px;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+    background: linear-gradient(160deg, #576574, #3d4c53);
+    z-index: 10;
+}
+.card.disabled {
+    filter: grayscale(1) brightness(0.5);
+    pointer-events: none; transform: none;
+}
+.cost {
+    position: absolute; top: -1px; left: -1px;
+    width: 20px; height: 20px;
+    background: #fff; color: #8854d0;
+    border-bottom-right-radius: 10px;
+    font-weight: 900; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+    z-index: 2; border: 2px solid #8854d0;
+}
+.emoji { font-size: 28px; filter: drop-shadow(0 3px 2px rgba(0,0,0,0.3)); margin-bottom: 2px; }
+.name { 
+    font-size: 10px; font-weight: 700; color: #fff;
+    text-shadow: 0 2px 2px rgba(0,0,0,0.8); 
+    white-space: nowrap; width: 100%; text-align: center;
+    transform: scale(0.9);
+}
+
+/* --- Top HUD & Name Display --- */
+#hud-top {
+    position: absolute; top: 0; left: 0; width: 100%;
+    padding: 10px 15px; box-sizing: border-box;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    pointer-events: none; z-index: 15;
+}
+#timer-box {
+    background: rgba(0,0,0,0.6); padding: 5px 15px;
+    border-radius: 20px; border: 1px solid rgba(255,255,255,0.2);
+    transition: all 0.3s; margin: 0 auto; pointer-events: none;
+}
+#timer-box.double-elixir {
+    background: rgba(232, 67, 147, 0.8);
+    box-shadow: 0 0 20px #e84393;
+    transform: scale(1.1);
+}
+#timer {
+    font-size: 24px; font-weight: 900; color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8); font-variant-numeric: tabular-nums;
+}
+
+/* 新增：左上角對手名字 */
+#enemy-info {
+    position: absolute; top: 15px; left: 15px;
+    background: rgba(231, 76, 60, 0.8); padding: 6px 14px;
+    border-radius: 12px; border: 2px solid #fff;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    color: white; font-weight: bold; font-size: 16px;
+    text-shadow: 0 2px 2px rgba(0,0,0,0.5);
+    pointer-events: auto;
+    display: flex; align-items: center; gap: 5px;
+}
+
+/* Emotes */
+#emote-wrapper {
+    position: absolute; bottom: 170px; left: 15px;
+    z-index: 30; display: flex; flex-direction: column-reverse; gap: 10px;
+}
+#emote-btn {
+    width: 44px; height: 44px;
+    background: rgba(0,0,0,0.6);
+    border: 2px solid #fff; border-radius: 50%;
+    font-size: 24px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; pointer-events: auto;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    transition: transform 0.1s;
+}
+#emote-menu {
+    background: rgba(0,0,0,0.8);
+    border-radius: 12px; padding: 8px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    opacity: 0; pointer-events: none; transform: scale(0.8) translateY(20px);
+    transition: all 0.2s ease-out;
+}
+#emote-menu.open { opacity: 1; pointer-events: auto; transform: scale(1) translateY(0); }
+.emote-opt { font-size: 28px; cursor: pointer; transition: transform 0.1s; }
+.emote-opt:hover { transform: scale(1.2); }
+
+#message {
+    position: absolute; top: 30%; width: 100%; text-align: center;
+    font-size: 48px; font-weight: 900; color: var(--accent);
+    -webkit-text-stroke: 2px #000;
+    text-shadow: 0 4px 15px rgba(0,0,0,0.6);
+    pointer-events: none; opacity: 0; 
+    transition: all 0.3s; transform: scale(0.5); z-index: 50;
+}
+#message.show { opacity: 1; transform: scale(1); }
+
+#elixir-mode-txt {
+    position: absolute; top: 20%; width: 100%; text-align: center;
+    font-size: 32px; font-weight: 900; color: #e84393;
+    text-shadow: 0 0 10px #fff, 0 0 20px #e84393;
+    pointer-events: none; opacity: 0; transform: scale(1.5);
+    transition: all 0.5s; z-index: 45;
+}
+#elixir-mode-txt.show { opacity: 1; transform: scale(1); }
+
+.overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 100; transition: opacity 0.3s;
+}
 .hidden { opacity: 0; pointer-events: none; display: none !important; }
 
-/* Start & Matchmaking UI */
-h1 { font-size: 56px; background: linear-gradient(to bottom, #f1c40f, #e67e22); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; font-style: italic; transform: skewX(-5deg); font-family: 'Arial Black', sans-serif; }
-#matchmaking-ui { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 20px; }
-.input-box { padding: 12px; font-size: 18px; border-radius: 10px; border: none; text-align: center; width: 200px; background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.3); }
-.status-txt { color: #bdc3c7; font-size: 16px; height: 20px; }
-.spinner { width: 30px; height: 30px; border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; display: none; }
+.title-group { text-align: center; margin-bottom: 40px; position: relative; }
+h1 {
+    font-size: 56px; 
+    background: linear-gradient(to bottom, #f1c40f, #e67e22);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin: 0; font-style: italic; letter-spacing: -1px;
+    transform: skewX(-5deg);
+    filter: drop-shadow(0 5px 0 #d35400) drop-shadow(0 15px 10px rgba(0,0,0,0.5));
+    font-family: 'Arial Black', var(--font-main); line-height: 1.2;
+}
+h1::after {
+    content: '👑'; font-style: normal; position: absolute; top: -25px; right: -10px;
+    font-size: 40px; transform: rotate(15deg); -webkit-text-fill-color: initial;
+    filter: drop-shadow(0 5px 5px rgba(0,0,0,0.5));
+}
+.subtitle { font-size: 16px; color: #dfe6e9; letter-spacing: 6px; margin-top: 10px; text-transform: uppercase; opacity: 0.8; }
+
+.menu-group { display: flex; flex-direction: column; gap: 20px; align-items: center; width: 100%; }
+
+/* Matchmaking Styles */
+#matchmaking-ui {
+    display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%;
+}
+.input-box {
+    padding: 12px; font-size: 18px; border-radius: 10px; border: none;
+    text-align: center; width: 220px;
+    background: rgba(255,255,255,0.1); color: #fff;
+    border: 1px solid rgba(255,255,255,0.3);
+}
+.match-status { color: #bdc3c7; font-size: 16px; height: 24px; display: flex; align-items: center; gap: 10px; }
+.spinner {
+    width: 20px; height: 20px;
+    border: 3px solid rgba(255,255,255,0.1);
+    border-left-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: none;
+}
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
-/* Editor Tags */
-#editor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(75px, 1fr)); gap: 8px; width: 100%; max-height: 50vh; overflow-y: auto; }
-.editor-card { height: auto; aspect-ratio: 3/4; opacity: 0.6; position: relative; }
+/* Editor Styles */
+#editor-container { width: 95%; max-width: 550px; max-height: 80vh; }
+#editor-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(75px, 1fr)); gap: 8px;
+    padding: 10px; background: rgba(0,0,0,0.3); border-radius: 16px;
+    width: 100%; box-sizing: border-box;
+    overflow-y: auto; max-height: 50vh;
+}
+.editor-card { 
+    transform: scale(0.95); opacity: 0.6; transition: all 0.2s; 
+    height: auto; aspect-ratio: 3/4; width: 100%;
+    position: relative;
+}
 .editor-card.picked { opacity: 1; transform: scale(1); border-color: #2ecc71; box-shadow: 0 0 15px #2ecc71; }
+.editor-card.picked::after {
+    content: '✓'; position: absolute; bottom: 2px; right: 2px;
+    background: #2ecc71; color: #fff; border-radius: 50%;
+    width: 16px; height: 16px; font-size: 12px; 
+    display: flex; align-items: center; justify-content: center;
+}
 .rec-tag { position: absolute; top: -5px; right: -5px; background: #2ecc71; color: #fff; font-size: 10px; padding: 2px 5px; border-radius: 4px; font-weight: bold; z-index: 5; box-shadow: 0 2px 2px rgba(0,0,0,0.5); }
-
-#message { position: absolute; top: 30%; width: 100%; text-align: center; font-size: 48px; font-weight: 900; color: var(--accent); pointer-events: none; opacity: 0; transform: scale(0.5); transition: all 0.3s; z-index: 50; text-shadow: 0 4px 10px black; }
-#message.show { opacity: 1; transform: scale(1); }
-#elixir-mode-txt { position: absolute; top: 20%; width: 100%; text-align: center; font-size: 32px; font-weight: 900; color: #e84393; text-shadow: 0 0 10px #fff; opacity: 0; transform: scale(1.5); transition: all 0.5s; z-index: 45; }
-#elixir-mode-txt.show { opacity: 1; transform: scale(1); }
+.editor-desc { min-height: 40px; color: #bdc3c7; font-size: 14px; text-align: center; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; width: 100%; box-sizing: border-box; margin-top: 10px; }
 
 </style>
 </head>
@@ -102,8 +358,13 @@ h1 { font-size: 56px; background: linear-gradient(to bottom, #f1c40f, #e67e22); 
 <div id="game-container">
     <div id="canvas-wrapper">
         <canvas id="gameCanvas"></canvas>
+
         <div id="hud-top">
-            <div id="enemy-name-display">等待對手...</div>
+            <!-- 左上角：對手名字 (還原後新增) -->
+            <div id="enemy-info">
+                <span style="font-size:20px;">⚔️</span>
+                <span id="enemy-name-txt">等待對手...</span>
+            </div>
             <div id="timer-box"><div id="timer">03:00</div></div>
         </div>
         
@@ -121,11 +382,15 @@ h1 { font-size: 56px; background: linear-gradient(to bottom, #f1c40f, #e67e22); 
         <div id="message"></div>
     </div>
 
+    <!-- 底部 UI (還原) -->
     <div id="ui-layer">
         <div id="elixir-area">
             <div id="elixir-badge">5</div>
-            <div id="elixir-bar-bg"><div id="elixir-fill"></div></div>
+            <div id="elixir-bar-bg">
+                <div id="elixir-fill"></div>
+            </div>
         </div>
+        
         <div id="deck-area">
             <div id="next-slot">
                 <span class="slot-label">下張</span>
@@ -139,47 +404,54 @@ h1 { font-size: 56px; background: linear-gradient(to bottom, #f1c40f, #e67e22); 
         </div>
     </div>
 
-    <!-- 開始畫面 (含暱稱與匹配) -->
+    <!-- Start Screen (還原風格 + 新增暱稱) -->
     <div id="start-screen" class="overlay">
-        <div class="title-group" style="text-align: center;">
+        <div class="title-group">
             <h1>CLASH<br>ONLINE</h1>
-            <div style="color:#bdc3c7; letter-spacing: 6px; margin-top: 10px;">終極連線版</div>
+            <div class="subtitle">經典連線版</div>
         </div>
         
         <div id="matchmaking-ui">
-            <input type="text" id="nickname" class="input-box" placeholder="輸入暱稱" maxlength="8" value="玩家1">
-            <div style="display: flex; align-items: center; gap: 10px; min-height: 30px;">
+            <input type="text" id="nickname" class="input-box" placeholder="輸入你的暱稱" maxlength="8" value="玩家1">
+            
+            <div class="match-status">
                 <div class="spinner" id="wait-spinner"></div>
-                <div class="status-txt" id="match-status">準備就緒</div>
+                <div id="match-status-txt">準備就緒</div>
             </div>
+
             <button class="btn" id="find-btn" onclick="Game.findMatch()">尋找對手</button>
             <button class="btn btn-secondary" onclick="Game.openDeckEditor()">編輯牌組</button>
         </div>
     </div>
 
-    <!-- 編輯器 -->
+    <!-- Editor (功能保留) -->
     <div id="deck-editor" class="overlay hidden">
-        <div class="panel" id="editor-container" style="width: 90%; max-width: 500px;">
-            <h2 style="color:var(--accent); margin:0 0 5px 0;">配置牌組</h2>
-            <div style="color:#aaa; font-size:12px; margin-bottom:10px;">請選擇 6 張卡牌 (標記為新手推薦)</div>
+        <div class="panel" id="editor-container">
+            <h2 style="color:var(--accent); margin:0 0 5px 0; font-style:italic;">配置出戰牌組</h2>
+            <div style="color:#aaa; font-size:12px; margin-bottom:10px;">請選擇 6 張卡牌</div>
             <div id="editor-grid"></div>
-            <div id="editor-desc" class="editor-desc" style="color:#fff; margin-top:15px; min-height:40px; background:rgba(0,0,0,0.3); padding:10px; border-radius:8px; width:100%; box-sizing:border-box; text-align:center;">點擊卡牌查看詳情</div>
-            <button class="btn" style="margin-top:10px;" onclick="Game.closeDeckEditor()">保存</button>
+            <div id="editor-desc" class="editor-desc">點擊卡牌查看詳情</div>
+            <button class="btn" style="margin-top:10px;" onclick="Game.closeDeckEditor()">保存並返回</button>
         </div>
     </div>
 
-    <!-- 結算畫面 -->
     <div id="end-screen" class="overlay hidden">
         <h1 id="end-title" style="font-size:80px;">勝利</h1>
-        <button class="btn" onclick="location.reload()">返回大廳</button>
+        <div style="display:flex; gap:20px;">
+            <button class="btn" onclick="location.reload()">返回大廳</button>
+        </div>
     </div>
 </div>
 
 <script>
-// --- 資料定義 (完全保留原始數值) ---
-const CONFIG = { ELIXIR_RATE_BASE: 0.018, ELIXIR_MAX: 10, GAME_TIME: 180, DOUBLE_ELIXIR_THRESHOLD: 60, RIVER_OFFSET: 0.5, BRIDGE_WIDTH: 60,
-COLORS: { P_MAIN: '#3498db', E_MAIN: '#e74c3c', GRASS: '#27ae60', WATER: '#48dbfb' } };
+// --- 配置 (還原原本的草地與水色) ---
+const CONFIG = {
+    ELIXIR_RATE_BASE: 0.018, ELIXIR_MAX: 10, GAME_TIME: 180, DOUBLE_ELIXIR_THRESHOLD: 60,
+    RIVER_OFFSET: 0.5, BRIDGE_WIDTH: 60,
+    COLORS: { P_MAIN: '#3498db', E_MAIN: '#e74c3c', GRASS: '#27ae60', WATER: '#48dbfb' } // 還原
+};
 
+// --- 卡牌定義 (保留所有敘述與數值) ---
 const CARDS = {
     knight: { id: 'knight', name: '騎士', desc: '近戰坦克，攻守兼備', cost: 3, count: 1, hp: 1400, dmg: 130, speed: 0.35, range: 0, atkSpd: 65, type: 'ground', target: 'any', icon: '⚔️', radius: 16, mass: 6.0, deployTime: 60, rarity: 'common' },
     archer: { id: 'archer', name: '弓箭手', desc: '遠程輸出，雙人組', cost: 3, count: 2, hp: 350, dmg: 80, speed: 0.4, range: 110, atkSpd: 50, type: 'ground', target: 'any', icon: '🏹', radius: 12, mass: 1.5, deployTime: 60, rarity: 'common' },
@@ -200,8 +472,7 @@ const CARDS = {
     goblins: { id: 'goblins', name: '哥布林', cost: 2, count: 3, hp: 180, dmg: 90, speed: 0.65, range: 0, atkSpd: 35, type: 'ground', target: 'any', icon: '👺', radius: 10, mass: 0.8, deployTime: 10, rarity: 'common' }
 };
 const ALL_CARDS = Object.keys(CARDS).filter(k => k !== 'goblins');
-// 新手推薦卡牌
-const RECOMMENDED_CARDS = ['knight', 'archer', 'giant', 'fireball', 'musketeer', 'arrows', 'minipekka'];
+const RECOMMENDED_CARDS = ['knight', 'archer', 'giant', 'fireball', 'musketeer', 'minipekka'];
 
 // --- 系統工具 ---
 const AudioSys = {
@@ -224,10 +495,11 @@ class Entity {
     constructor(x, y, team, radius) {
         this.pos = new Vector2(x, y); this.team = team; this.radius = radius;
         this.dead = false; this.hp = 100; this.maxHp = 100; this.flash = 0;
-        this.knockbackVel = new Vector2(0,0); this.stunTimer = 0;
+        this.knockbackVel = new Vector2(0,0); this.stunTimer = 0; this.shakeX=0; this.shakeY=0;
     }
     takeDamage(amt) {
         this.hp -= amt; this.flash = 5;
+        this.shakeX = (Math.random()-0.5)*6; this.shakeY = (Math.random()-0.5)*6;
         Game.particles.get(this.pos.x, this.pos.y-30, '#fff', 'text', Math.floor(amt));
         if(this.hp <= 0) { this.dead = true; if(this.deathDmg) Game.projectiles.push(new Projectile(this.pos, new Vector2(0,0), this.deathDmg, 100, 'fireball', this.team)); }
     }
@@ -237,6 +509,7 @@ class Entity {
             ctx.fillStyle = this.team==='player'?CONFIG.COLORS.P_MAIN:CONFIG.COLORS.E_MAIN; ctx.fillRect(this.pos.x-w/2, this.pos.y-this.radius-offset, w*(this.hp/this.maxHp), 4);
         }
     }
+    update(){ this.shakeX*=0.8; this.shakeY*=0.8; if(this.flash>0) this.flash--; if(this.stunTimer>0) this.stunTimer--; if(this.knockbackVel.mag()>0.1){this.pos.add(this.knockbackVel);this.knockbackVel.mult(0.85);} }
 }
 
 class Unit extends Entity {
@@ -248,11 +521,8 @@ class Unit extends Entity {
         this.atkTimer = 0; this.facing = 1; this.frame = Math.random()*100;
     }
     update() {
-        if(this.dead) return;
-        if(this.knockbackVel.mag()>0.1) { this.pos.add(this.knockbackVel); this.knockbackVel.mult(0.85); this.collide(); return; }
-        if(this.deployTimer>0) { this.deployTimer--; return; }
-        if(this.stunTimer>0) { this.stunTimer--; return; }
-        this.frame++; if(this.flash>0) this.flash--; if(this.atkTimer>0) this.atkTimer--;
+        super.update(); if(this.dead || this.deployTimer>0 || this.stunTimer>0) { if(this.deployTimer>0) this.deployTimer--; return; }
+        this.frame++; if(this.atkTimer>0) this.atkTimer--;
         
         const target = this.findTarget();
         if(target) {
@@ -306,7 +576,7 @@ class Unit extends Entity {
         return best;
     }
     draw(ctx) {
-        ctx.save(); ctx.translate(this.pos.x, this.pos.y); if(this.type==='air') ctx.translate(0,-40);
+        ctx.save(); ctx.translate(this.pos.x + this.shakeX, this.pos.y + this.shakeY); if(this.type==='air') ctx.translate(0,-40);
         if(this.deployTimer>0) {
             ctx.globalAlpha=0.6; ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.arc(0,0,this.radius,0,Math.PI*2); ctx.fill();
             ctx.beginPath(); ctx.moveTo(0,0); ctx.fillStyle='#fff'; ctx.arc(0,0,this.radius,-Math.PI/2,-Math.PI/2+(Math.PI*2*(1-this.deployTimer/this.maxDeploy))); ctx.fill(); ctx.restore(); return;
@@ -314,6 +584,7 @@ class Unit extends Entity {
         if(this.flash>0) ctx.filter='brightness(2)';
         ctx.scale(this.facing, 1);
         ctx.fillStyle = this.team==='player' ? CONFIG.COLORS.P_MAIN : CONFIG.COLORS.E_MAIN;
+        // 繪圖還原(簡化圓形+icon)
         ctx.beginPath(); ctx.arc(0,-5,this.radius,0,Math.PI*2); ctx.fill();
         ctx.font="20px serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(CARDS[this.key].icon,0,-5);
         ctx.restore(); this.drawHp(ctx, this.radius+(this.type==='air'?45:5));
@@ -325,10 +596,10 @@ class Tower extends Entity {
         super(x, y, team, isKing?32:24);
         this.isKing = isKing; this.active = !isKing;
         this.maxHp = isKing?4000:2500; this.hp = this.maxHp; this.range = 160; this.atkTimer = 0;
-        this.name = "";
+        this.name = ""; 
     }
     update() {
-        if(this.dead) return; if(this.flash>0) this.flash--;
+        super.update(); if(this.dead) return;
         if(this.isKing && !this.active) { if(this.hp<this.maxHp || Game.towers.some(t=>t.team===this.team && !t.isKing && t.dead)) this.active=true; }
         if(!this.active) return;
         if(this.atkTimer>0) this.atkTimer--;
@@ -340,15 +611,11 @@ class Tower extends Entity {
         }
     }
     draw(ctx) {
-        const x = this.pos.x, y = this.pos.y;
+        const x = this.pos.x + this.shakeX, y = this.pos.y + this.shakeY;
         ctx.fillStyle = '#95a5a6'; ctx.fillRect(x-this.radius, y-10, this.radius*2, 20);
         ctx.fillStyle = this.team==='player'?CONFIG.COLORS.P_MAIN:CONFIG.COLORS.E_MAIN; ctx.fillRect(x-15, y-40, 30, 30);
         if(this.isKing) {
             ctx.font = "30px serif"; ctx.textAlign="center"; ctx.fillText(this.active?"👑":"💤", x, y-45);
-            if(this.name) {
-                ctx.font = "bold 14px sans-serif"; ctx.fillStyle = "#fff"; ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
-                ctx.strokeText(this.name, x, y-80); ctx.fillText(this.name, x, y-80);
-            }
         }
         this.drawHp(ctx, this.isKing?65:45);
     }
@@ -413,7 +680,7 @@ const Game = {
     findMatch() {
         this.playerName = document.getElementById('nickname').value.trim() || "玩家1";
         const btn = document.getElementById('find-btn');
-        const status = document.getElementById('match-status');
+        const status = document.getElementById('match-status-txt');
         const spinner = document.getElementById('wait-spinner');
 
         btn.disabled = true;
@@ -421,10 +688,10 @@ const Game = {
         spinner.style.display = 'block';
 
         if(!socket) socket = io();
-
+        
         // Render 喚醒提示
         let connected = false;
-        setTimeout(() => { if(!connected) status.innerText = "伺服器喚醒中 (約30秒)..."; }, 3000);
+        setTimeout(() => { if(!connected) status.innerText = "伺服器喚醒中..."; }, 3000);
 
         socket.on('connect', () => {
             connected = true;
@@ -436,20 +703,21 @@ const Game = {
             this.roomID = data.roomID;
             status.innerText = "配對成功！";
             this.startGame();
-            // 同步名字
+            // 立即發送名字
             socket.emit('action', { roomID: this.roomID, type: 'name_sync', name: this.playerName });
         });
 
         socket.on('remote_action', (data) => {
             if(data.type === 'spawn') {
-                // 關鍵修正：使用百分比座標還原並翻轉 (1 - n)
                 const realX = (1 - data.nx) * this.width;
                 const realY = (1 - data.ny) * this.height;
                 this.spawn(data.card, realX, realY, 'enemy');
             } else if (data.type === 'name_sync') {
+                // 收到名字，更新 UI
+                const nameDisplay = document.getElementById('enemy-name-txt');
+                if(nameDisplay) nameDisplay.innerText = data.name;
                 const t = this.towers.find(t => t.team === 'enemy' && t.isKing);
                 if(t) t.name = data.name;
-                document.getElementById('enemy-name-display').innerText = data.name; // Update HUD
             } else if (data.type === 'emote') {
                 this.showEmote(data.val, 'enemy');
             }
@@ -464,7 +732,6 @@ const Game = {
         this.reset();
         this.running = true;
         
-        // 設定己方名字
         const t = this.towers.find(t => t.team === 'player' && t.isKing);
         if(t) t.name = this.playerName;
 
@@ -494,11 +761,11 @@ const Game = {
             new Tower(bL, pY, 'player', false), new Tower(bR, pY, 'player', false), new Tower(this.width/2, pY+50, 'player', true),
             new Tower(bL, eY, 'enemy', false), new Tower(bR, eY, 'enemy', false), new Tower(this.width/2, eY-50, 'enemy', true)
         ];
-        document.getElementById('enemy-name-display').innerText = "等待對手...";
+        document.getElementById('enemy-name-txt').innerText = "等待對手...";
         this.renderDeck();
     },
 
-    // --- 操作與下兵 ---
+    // --- 操作 ---
     pDown(e) {
         if(!this.running) return;
         const t = e.target.closest('.card');
@@ -542,7 +809,6 @@ const Game = {
                 nx: x / this.width, ny: y / this.height
             });
         }
-
         this.hand[idx] = this.nextCard;
         this.nextCard = this.deck.length>0 ? this.deck.pop() : this.userLoadout[Math.floor(Math.random()*6)];
         this.renderDeck();
@@ -593,7 +859,22 @@ const Game = {
 
     draw() {
         this.ctx.clearRect(0,0,this.width,this.height);
-        this.drawMap();
+        // 原始地圖繪製邏輯 (草地+格紋+水+橋)
+        this.ctx.fillStyle = CONFIG.COLORS.GRASS; this.ctx.fillRect(0,0,this.width,this.height);
+        this.ctx.fillStyle = 'rgba(0,0,0,0.03)'; const size = 40; // 格紋
+        for(let x=0; x<this.width; x+=size) for(let y=0; y<this.height; y+=size) if((x/size + y/size)%2===0) this.ctx.fillRect(x, y, size, size);
+        
+        const ry = this.height*CONFIG.RIVER_OFFSET;
+        this.ctx.fillStyle = CONFIG.COLORS.WATER; this.ctx.fillRect(0, ry-30, this.width, 60);
+        
+        const drawBridge = (bx) => {
+            this.ctx.fillStyle = '#636e72'; this.ctx.fillRect(bx-30, ry-35, 60, 70);
+            this.ctx.fillStyle = '#b2bec3'; this.ctx.fillRect(bx-26, ry-35, 52, 70);
+            this.ctx.fillStyle = '#dfe6e9'; for(let i=0; i<6; i++) this.ctx.fillRect(bx-24, ry-30 + i*11, 48, 4);
+        };
+        drawBridge(this.width*0.25); drawBridge(this.width*0.75);
+
+        // 繪製實體
         this.units.forEach(u=>u.drawShadow(this.ctx)); this.towers.forEach(t=>t.drawShadow(this.ctx));
         [...this.towers, ...this.units].sort((a,b)=>a.pos.y-b.pos.y).forEach(e=>e.draw(this.ctx));
         this.projectiles.forEach(p=>p.draw(this.ctx));
@@ -607,14 +888,6 @@ const Game = {
             this.ctx.font="30px serif"; this.ctx.textAlign="center"; this.ctx.fillText(d.icon,0,10);
             this.ctx.restore();
         }
-    },
-
-    drawMap() {
-        this.ctx.fillStyle = CONFIG.COLORS.GRASS; this.ctx.fillRect(0,0,this.width,this.height);
-        const ry = this.height*CONFIG.RIVER_OFFSET;
-        this.ctx.fillStyle = CONFIG.COLORS.WATER; this.ctx.fillRect(0, ry-30, this.width, 60);
-        this.ctx.fillStyle = '#636e72'; 
-        this.ctx.fillRect(this.width*0.25-30, ry-35, 60, 70); this.ctx.fillRect(this.width*0.75-30, ry-35, 60, 70);
     },
 
     renderElixir() {
@@ -645,7 +918,6 @@ const Game = {
         document.getElementById('end-screen').classList.remove('hidden');
     },
 
-    // 編輯器與敘述修復
     openDeckEditor(){ document.getElementById('deck-editor').classList.remove('hidden'); this.renderEditor(); },
     closeDeckEditor(){ if(this.userLoadout.length===6) document.getElementById('deck-editor').classList.add('hidden'); else alert("需6張卡"); },
     renderEditor(){
@@ -653,13 +925,11 @@ const Game = {
         ALL_CARDS.forEach(k=>{
             const d=CARDS[k], el=document.createElement('div');
             el.className=`editor-card card ${d.rarity} ${this.userLoadout.includes(k)?'picked':''}`;
-            // 新增推薦標籤
-            const recTag = RECOMMENDED_CARDS.includes(k) ? `<div class="rec-tag">推薦</div>` : '';
-            el.innerHTML=`${recTag}<div class="cost">${d.cost}</div><div class="card-inner"><div class="emoji">${d.icon}</div></div>`;
+            const rec = RECOMMENDED_CARDS.includes(k) ? `<div class="rec-tag">推薦</div>` : '';
+            el.innerHTML=`${rec}<div class="cost">${d.cost}</div><div class="card-inner"><div class="emoji">${d.icon}</div></div>`;
             el.onclick=()=>{
                 if(this.userLoadout.includes(k)){ if(this.userLoadout.length>1) this.userLoadout=this.userLoadout.filter(c=>c!==k); }
                 else{ if(this.userLoadout.length<6) this.userLoadout.push(k); }
-                // 恢復敘述顯示
                 document.getElementById('editor-desc').innerText = `${d.name}: ${d.desc}`;
                 this.renderEditor();
             };
