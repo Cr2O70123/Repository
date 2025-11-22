@@ -447,4 +447,228 @@ const Game = {
                 const realY = (1 - data.ny) * this.height;
                 this.spawn(data.card, realX, realY, 'enemy');
             } else if (data.type === 'name_sync') {
+                const t = this.towers.find(t => t.team === 'enemy' && t.isKing);
+                if(t) t.name = data.name;
+                document.getElementById('enemy-name-display').innerText = data.name; // Update HUD
+            } else if (data.type === 'emote') {
+                this.showEmote(data.val, 'enemy');
+            }
+        });
         
+        socket.on('opponent_left', () => this.endGame(true));
+    },
+
+    startGame() {
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('end-screen').classList.add('hidden');
+        this.reset();
+        this.running = true;
+        
+        // 設定己方名字
+        const t = this.towers.find(t => t.team === 'player' && t.isKing);
+        if(t) t.name = this.playerName;
+
+        let timeLeft = CONFIG.GAME_TIME;
+        this.timerInt = setInterval(() => {
+            if(!this.running) return;
+            timeLeft--;
+            const m = Math.floor(timeLeft/60), s = timeLeft%60;
+            document.getElementById('timer').innerText = `0${m}:${s<10?'0'+s:s}`;
+            if(timeLeft===CONFIG.DOUBLE_ELIXIR_THRESHOLD) {
+                document.getElementById('elixir-mode-txt').className='show';
+                setTimeout(()=>document.getElementById('elixir-mode-txt').className='',2000);
+            }
+            if(timeLeft<=0) this.endGame(null);
+        }, 1000);
+        this.loop();
+    },
+
+    reset() {
+        this.units=[]; this.projectiles=[]; this.particles.clear(); this.elixir=5;
+        this.deck = [...this.userLoadout, ...this.userLoadout].sort(()=>Math.random()-0.5);
+        this.hand = []; for(let i=0;i<4;i++) this.hand.push(this.deck.pop());
+        this.nextCard = this.deck.pop();
+        
+        const pY=this.height-140, eY=140, bL=this.width*0.25, bR=this.width*0.75;
+        this.towers = [
+            new Tower(bL, pY, 'player', false), new Tower(bR, pY, 'player', false), new Tower(this.width/2, pY+50, 'player', true),
+            new Tower(bL, eY, 'enemy', false), new Tower(bR, eY, 'enemy', false), new Tower(this.width/2, eY-50, 'enemy', true)
+        ];
+        document.getElementById('enemy-name-display').innerText = "等待對手...";
+        this.renderDeck();
+    },
+
+    // --- 操作與下兵 ---
+    pDown(e) {
+        if(!this.running) return;
+        const t = e.target.closest('.card');
+        const rect = this.canvas.getBoundingClientRect();
+        if(t && t.dataset.index) {
+            const idx = parseInt(t.dataset.index);
+            if(this.elixir >= CARDS[this.hand[idx]].cost) {
+                this.draggingIdx = idx; this.selectedIdx = idx; this.isDragging = true;
+                this.dragPos = {x: e.clientX-rect.left, y: e.clientY-rect.top};
+                this.renderDeck();
+            }
+        } else if (this.selectedIdx !== null && !this.isDragging) {
+            const y = e.clientY - rect.top;
+            if(y < this.height) this.trySpawn(this.selectedIdx, e.clientX-rect.left, y);
+        }
+    },
+    pMove(e) { 
+        const rect = this.canvas.getBoundingClientRect();
+        if(this.isDragging) this.dragPos = {x: e.clientX-rect.left, y: e.clientY-rect.top};
+    },
+    pUp(e) {
+        if(this.isDragging) {
+            const rect = this.canvas.getBoundingClientRect();
+            if(e.clientY-rect.top < this.height-100) this.trySpawn(this.draggingIdx, this.dragPos.x, this.dragPos.y);
+            this.isDragging=false; this.draggingIdx=null; this.selectedIdx=null; this.renderDeck();
+        }
+    },
+
+    trySpawn(idx, x, y) {
+        const key = this.hand[idx];
+        const d = CARDS[key];
+        const riverY = this.height * CONFIG.RIVER_OFFSET;
+        if(d.type!=='spell' && y < riverY) { this.msg("僅能部署於己方區域"); return; }
+        
+        this.elixir -= d.cost;
+        this.spawn(key, x, y, 'player');
+        
+        if(socket) {
+            socket.emit('action', {
+                roomID: this.roomID, type: 'spawn', card: key,
+                nx: x / this.width, ny: y / this.height
+            });
+        }
+
+        this.hand[idx] = this.nextCard;
+        this.nextCard = this.deck.length>0 ? this.deck.pop() : this.userLoadout[Math.floor(Math.random()*6)];
+        this.renderDeck();
+    },
+
+    spawn(key, x, y, team) {
+        const d = CARDS[key];
+        AudioSys.play('spawn');
+        if(d.type==='spell') {
+            Game.projectiles.push(new Projectile(new Vector2(this.width/2, team==='player'?this.height:0), new Vector2(x,y), d.dmg, d.aoe, key, team));
+        } else {
+            const count = d.count || 1;
+            for(let i=0; i<count; i++) {
+                let ox = (i-(count-1)/2)*15; 
+                this.units.push(new Unit(x+ox, y, team, key));
+            }
+            Game.particles.get(x, y, '#fff', 'spawn_flash', 0);
+        }
+    },
+
+    triggerEmote(emoji) {
+        this.showEmote(emoji, 'player');
+        if(socket) socket.emit('action', { roomID: this.roomID, type: 'emote', val: emoji });
+        document.getElementById('emote-menu').classList.remove('open');
+    },
+    showEmote(emoji, team) {
+        const t = this.towers.find(t => t.team === team && t.isKing);
+        if(t) Game.particles.get(t.pos.x, t.pos.y-60, null, 'emote', emoji);
+    },
+
+    loop() {
+        if(!this.running) return;
+        requestAnimationFrame(() => this.loop());
+        
+        this.elixir = Math.min(CONFIG.ELIXIR_MAX, this.elixir + CONFIG.ELIXIR_RATE_BASE);
+        this.renderElixir();
+
+        [...this.units, ...this.towers, ...this.projectiles].forEach(e => e.update());
+        this.particles.updateAndDraw(this.ctx);
+        this.units = this.units.filter(u=>!u.dead); this.towers = this.towers.filter(t=>!t.dead); this.projectiles = this.projectiles.filter(p=>!p.dead);
+        
+        const pK = this.towers.find(t=>t.team==='player'&&t.isKing);
+        const eK = this.towers.find(t=>t.team==='enemy'&&t.isKing);
+        if(!pK) this.endGame(false); else if(!eK) this.endGame(true);
+        
+        this.draw();
+    },
+
+    draw() {
+        this.ctx.clearRect(0,0,this.width,this.height);
+        this.drawMap();
+        this.units.forEach(u=>u.drawShadow(this.ctx)); this.towers.forEach(t=>t.drawShadow(this.ctx));
+        [...this.towers, ...this.units].sort((a,b)=>a.pos.y-b.pos.y).forEach(e=>e.draw(this.ctx));
+        this.projectiles.forEach(p=>p.draw(this.ctx));
+        
+        if(this.isDragging) {
+            const d = CARDS[this.hand[this.draggingIdx]];
+            const valid = d.type==='spell' || this.dragPos.y > this.height*CONFIG.RIVER_OFFSET;
+            this.ctx.save(); this.ctx.translate(this.dragPos.x, this.dragPos.y);
+            this.ctx.globalAlpha=0.5; this.ctx.fillStyle=valid?'#3498db':'#e74c3c';
+            this.ctx.beginPath(); this.ctx.arc(0,0,d.radius||d.aoe||20,0,Math.PI*2); this.ctx.fill();
+            this.ctx.font="30px serif"; this.ctx.textAlign="center"; this.ctx.fillText(d.icon,0,10);
+            this.ctx.restore();
+        }
+    },
+
+    drawMap() {
+        this.ctx.fillStyle = CONFIG.COLORS.GRASS; this.ctx.fillRect(0,0,this.width,this.height);
+        const ry = this.height*CONFIG.RIVER_OFFSET;
+        this.ctx.fillStyle = CONFIG.COLORS.WATER; this.ctx.fillRect(0, ry-30, this.width, 60);
+        this.ctx.fillStyle = '#636e72'; 
+        this.ctx.fillRect(this.width*0.25-30, ry-35, 60, 70); this.ctx.fillRect(this.width*0.75-30, ry-35, 60, 70);
+    },
+
+    renderElixir() {
+        document.getElementById('elixir-fill').style.width = (this.elixir*10)+'%';
+        document.getElementById('elixir-badge').innerText = Math.floor(this.elixir);
+        document.querySelectorAll('#hand-cards .card').forEach((el,i)=>{
+            if(this.hand[i]) el.classList.toggle('disabled', this.elixir < CARDS[this.hand[i]].cost);
+        });
+    },
+    renderDeck() {
+        document.getElementById('next-icon').innerText = CARDS[this.nextCard].icon;
+        const h = document.getElementById('hand-cards'); h.innerHTML='';
+        this.hand.forEach((k,i)=>{
+            const d=CARDS[k], el=document.createElement('div');
+            el.className=`card ${d.rarity}`; el.dataset.index=i;
+            if(this.selectedIdx===i && !this.isDragging) el.classList.add('selected');
+            if(this.draggingIdx===i) el.classList.add('dragging');
+            el.innerHTML=`<div class="cost">${d.cost}</div><div class="card-inner"><div class="emoji">${d.icon}</div></div>`;
+            h.appendChild(el);
+        });
+        this.renderElixir();
+    },
+    msg(t){ const m=document.getElementById('message'); m.innerText=t; m.className='show'; setTimeout(()=>m.className='',1200); },
+    endGame(win){
+        this.running=false; clearInterval(this.timerInt); if(socket) socket.disconnect();
+        if(win===null){ const p=this.towers.filter(t=>t.team==='player').reduce((a,b)=>a+b.hp,0), e=this.towers.filter(t=>t.team==='enemy').reduce((a,b)=>a+b.hp,0); win=p>=e; }
+        const t=document.getElementById('end-title'); t.innerText=win?"勝利":"失敗"; t.style.color=win?"#f1c40f":"#e74c3c";
+        document.getElementById('end-screen').classList.remove('hidden');
+    },
+
+    // 編輯器與敘述修復
+    openDeckEditor(){ document.getElementById('deck-editor').classList.remove('hidden'); this.renderEditor(); },
+    closeDeckEditor(){ if(this.userLoadout.length===6) document.getElementById('deck-editor').classList.add('hidden'); else alert("需6張卡"); },
+    renderEditor(){
+        const g=document.getElementById('editor-grid'); g.innerHTML='';
+        ALL_CARDS.forEach(k=>{
+            const d=CARDS[k], el=document.createElement('div');
+            el.className=`editor-card card ${d.rarity} ${this.userLoadout.includes(k)?'picked':''}`;
+            // 新增推薦標籤
+            const recTag = RECOMMENDED_CARDS.includes(k) ? `<div class="rec-tag">推薦</div>` : '';
+            el.innerHTML=`${recTag}<div class="cost">${d.cost}</div><div class="card-inner"><div class="emoji">${d.icon}</div></div>`;
+            el.onclick=()=>{
+                if(this.userLoadout.includes(k)){ if(this.userLoadout.length>1) this.userLoadout=this.userLoadout.filter(c=>c!==k); }
+                else{ if(this.userLoadout.length<6) this.userLoadout.push(k); }
+                // 恢復敘述顯示
+                document.getElementById('editor-desc').innerText = `${d.name}: ${d.desc}`;
+                this.renderEditor();
+            };
+            g.appendChild(el);
+        });
+    }
+};
+
+window.onload = () => Game.init();
+</script>
+</body>
+</html>
