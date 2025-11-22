@@ -1,91 +1,133 @@
 :root {
-    --primary: #3498db; --accent: #f1c40f; --danger: #e74c3c;
-    --dark: #2c3e50; --darker: #1e272e;
-    --common: #bdc3c7; --rare: #f39c12; --epic: #9b59b6; --legendary: #00cec9;
+    --primary: #3498db; --primary-dark: #2980b9;
+    --accent: #f1c40f; --accent-dark: #f39c12;
+    --danger: #e74c3c;
+    --bg-dark: #1e272e; --panel-bg: rgba(30, 39, 46, 0.95);
+    --common: #b2bec3; --rare: #f1c40f; --epic: #9b59b6; --legendary: #00cec9;
 }
-body { margin: 0; background: #000; font-family: "PingFang TC", sans-serif; overflow: hidden; color: white; user-select: none; }
+
+body { margin: 0; background: #000; font-family: "PingFang TC", system-ui, sans-serif; overflow: hidden; color: white; user-select: none; touch-action: none; }
+button { font-family: inherit; outline: none; -webkit-tap-highlight-color: transparent; }
 
 /* 通用頁面控制 */
-.page { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--darker); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; transition: opacity 0.3s; }
-.hidden { display: none !important; opacity: 0; pointer-events: none; }
-.overlay { background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); z-index: 100; }
+.page { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, #2c3e50, #000); display: flex; flex-direction: column; z-index: 1; transition: transform 0.3s ease; }
+.page.hidden { transform: scale(1.1); opacity: 0; pointer-events: none; z-index: 0; }
+.page.active { transform: scale(1); opacity: 1; }
 
-/* 容器與面板 */
-.panel { background: rgba(255,255,255,0.1); padding: 30px; border-radius: 20px; text-align: center; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); width: 80%; max-width: 400px; }
-.transparent-panel { background: transparent; border: none; backdrop-filter: none; }
-.full-panel { width: 95%; height: 80%; display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden; }
-.scroll-content { flex: 1; overflow-y: auto; width: 100%; padding: 10px; box-sizing: border-box; }
-
-/* 文字 */
-h1 { font-size: 48px; background: linear-gradient(to bottom, #f1c40f, #e67e22); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; font-style: italic; text-shadow: 0 5px 0 rgba(0,0,0,0.3); }
-.small-title { font-size: 32px; }
-.subtitle { color: #bdc3c7; letter-spacing: 5px; margin-bottom: 20px; font-size: 14px; }
-.status-text { color: #bdc3c7; margin: 10px 0; height: 20px; }
-
-/* 按鈕與輸入 */
-.btn { background: linear-gradient(180deg, #3498db, #2980b9); border: none; border-radius: 12px; padding: 12px 30px; color: white; font-size: 18px; font-weight: 800; box-shadow: 0 5px 0 #1c5980; cursor: pointer; min-width: 140px; margin: 5px; transition: transform 0.1s; }
+/* 按鈕樣式 */
+.btn { background: linear-gradient(to bottom, var(--primary), var(--primary-dark)); border: none; border-radius: 12px; padding: 12px 24px; color: white; font-weight: 800; font-size: 18px; box-shadow: 0 4px 0 #1c5980; cursor: pointer; transition: transform 0.1s; }
 .btn:active { transform: translateY(4px); box-shadow: 0 0 0 #1c5980; }
-.btn-large { font-size: 24px; padding: 15px 50px; width: 100%; max-width: 300px; margin-bottom: 20px; }
-.btn-sec { background: linear-gradient(180deg, #95a5a6, #7f8c8d); box-shadow: 0 5px 0 #566161; font-size: 16px; padding: 10px; }
-.btn-sec:active { box-shadow: 0 0 0 #566161; }
-.btn-back { background: none; border: none; color: white; font-size: 24px; cursor: pointer; margin-right: 10px; }
-.input-box { padding: 15px; font-size: 20px; border-radius: 10px; border: 2px solid #555; background: rgba(0,0,0,0.3); color: #fff; text-align: center; margin-bottom: 15px; width: 200px; }
+.btn-large { width: 80%; max-width: 300px; padding: 16px; font-size: 22px; margin-top: 20px; }
+.btn-small { padding: 6px 16px; font-size: 14px; box-shadow: 0 3px 0 #1c5980; min-width: auto; }
+.btn-back { background: transparent; border: none; font-size: 24px; color: white; margin-right: 15px; cursor: pointer; }
+.btn-icon { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); width: 40px; height: 40px; border-radius: 50%; color: white; font-size: 20px; cursor: pointer; }
 
-/* 大廳 */
-.lobby-header { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: space-between; box-sizing: border-box; z-index: 20; }
-.user-badge, .currency-badge { background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; }
-.currency-badge span { color: #f1c40f; }
-.menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 300px; margin: 0 auto; }
+/* 登入畫面 */
+.login-panel { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.logo-area { margin-bottom: 40px; text-align: center; }
+h1 { font-size: 60px; line-height: 1; margin: 0; background: linear-gradient(to bottom, #f1c40f, #e67e22); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-style: italic; transform: skewX(-5deg); filter: drop-shadow(0 4px 0 rgba(0,0,0,0.5)); }
+.subtitle { letter-spacing: 8px; color: #bdc3c7; margin-top: 5px; font-weight: bold; }
+.input-box { background: rgba(0,0,0,0.4); border: 2px solid #555; color: white; padding: 15px; border-radius: 10px; font-size: 20px; text-align: center; width: 250px; }
+
+/* 大廳佈局 */
+.top-bar { padding: 15px; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); }
+.user-info { display: flex; align-items: center; gap: 10px; }
+.avatar { width: 50px; height: 50px; background: linear-gradient(135deg, #3498db, #8e44ad); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+.name-box { display: flex; flex-direction: column; }
+#lobby-name { font-weight: bold; font-size: 18px; }
+.gold-display { font-size: 14px; color: var(--accent); font-weight: bold; background: rgba(0,0,0,0.5); padding: 2px 8px; border-radius: 10px; margin-top: 2px; display: inline-block; }
+
+.lobby-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.hero-graphic { font-size: 120px; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5)); animation: float 3s ease-in-out infinite; }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+.status-text { color: #bdc3c7; margin: 20px 0; min-height: 24px; }
+.btn-play { background: linear-gradient(to bottom, #f1c40f, #e67e22); box-shadow: 0 6px 0 #d35400; font-size: 28px; padding: 20px 60px; border-radius: 20px; }
+.btn-play:active { box-shadow: 0 0 0 #d35400; }
+.btn-checkin { position: absolute; right: 20px; bottom: 100px; background: linear-gradient(to bottom, #2ecc71, #27ae60); border: none; padding: 10px 20px; border-radius: 20px; color: white; font-weight: bold; box-shadow: 0 4px 0 #16a085; cursor: pointer; animation: pulse 2s infinite; }
+
+/* 底部導航 */
+.bottom-nav { height: 70px; background: var(--panel-bg); display: flex; justify-content: space-around; align-items: center; border-top: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
+.nav-item { text-align: center; color: #95a5a6; font-size: 12px; cursor: pointer; transition: 0.2s; flex: 1; }
+.nav-item.active { color: white; transform: translateY(-5px); text-shadow: 0 0 10px rgba(255,255,255,0.5); }
+.nav-item:active { transform: scale(0.9); }
 
 /* 商店與列表 */
-.header-bar { width: 100%; padding: 15px; background: rgba(0,0,0,0.3); font-size: 20px; font-weight: bold; display: flex; align-items: center; z-index: 20; }
-.grid-view { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; justify-items: center; }
-#shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; padding-bottom: 50px; }
+.header { padding: 15px; display: flex; align-items: center; background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); z-index: 10; }
+.header h2 { margin: 0; flex: 1; font-size: 20px; }
+.header-gold { color: var(--accent); font-weight: bold; font-size: 18px; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 15px; }
+.scroll-view { flex: 1; overflow-y: auto; padding: 15px; }
+.grid-layout { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; padding-bottom: 80px; }
 
-/* 卡片樣式 (商店用) */
-.shop-item { background: rgba(255,255,255,0.05); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; align-items: center; position: relative; border: 1px solid transparent; }
-.shop-item.owned { opacity: 0.5; pointer-events: none; }
-.shop-item.owned::after { content: '已擁有'; position: absolute; top: 30%; background: #2ecc71; padding: 2px 5px; font-size: 10px; border-radius: 4px; }
-.price-tag { color: #f1c40f; font-weight: bold; margin-top: 5px; font-size: 14px; }
-.shop-btn { padding: 5px 10px; font-size: 12px; margin-top: 5px; min-width: auto; }
+/* 商店卡牌 */
+.shop-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; align-items: center; border: 1px solid rgba(255,255,255,0.1); position: relative; transition: 0.2s; }
+.shop-card.owned { opacity: 0.5; filter: grayscale(1); pointer-events: none; }
+.shop-card.owned::after { content: '已擁有'; position: absolute; top: 40%; background: #27ae60; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+.shop-icon { font-size: 40px; margin-bottom: 5px; }
+.shop-name { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
+.shop-price { color: var(--accent); font-weight: bold; font-size: 14px; }
+.shop-btn { background: var(--primary); border: none; border-radius: 6px; color: white; padding: 4px 12px; margin-top: 8px; font-size: 12px; cursor: pointer; }
+
+/* 牌組編輯 */
+.deck-preview { padding: 10px 15px; background: rgba(0,0,0,0.2); }
+.mini-card-row { display: flex; gap: 8px; height: 60px; }
+.mini-deck-card { width: 45px; height: 60px; background: #34495e; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 24px; border: 1px solid #7f8c8d; cursor: pointer; }
 
 /* 排行榜表格 */
-table { width: 100%; border-collapse: collapse; }
-th, td { padding: 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
-th { color: var(--accent); }
-tr:nth-child(1) td { color: #f1c40f; font-weight: bold; } /* 第一名金色 */
+.rank-table { width: 100%; border-collapse: collapse; }
+.rank-table th { text-align: left; color: var(--common); padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 14px; }
+.rank-table td { padding: 15px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.rank-1 { color: #f1c40f; font-weight: bold; font-size: 18px; }
+.rank-2 { color: #bdc3c7; font-weight: bold; }
+.rank-3 { color: #d35400; font-weight: bold; }
 
-/* 遊戲內介面 (維持原樣) */
-#game-container { width: 100%; height: 100%; display: flex; flex-direction: column; }
-#canvas-wrapper { flex: 1; position: relative; background: #2c3e50; }
-canvas { width: 100%; height: 100%; }
-#ui-layer { height: 160px; background: rgba(30,39,46,0.95); border-top: 1px solid rgba(255,255,255,0.15); display: flex; flex-direction: column; padding: 5px 10px; }
-#elixir-area { display: flex; align-items: center; gap: 10px; height: 30px; margin-bottom: 5px; }
-#elixir-badge { width: 30px; height: 30px; background: linear-gradient(135deg, #a55eea, #8854d0); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; border: 2px solid #fff; z-index: 2; }
-#elixir-bar-bg { flex: 1; height: 12px; background: rgba(0,0,0,0.8); border: 2px solid #57606f; border-radius: 10px; overflow: hidden; }
-#elixir-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #a55eea, #d980fa); transition: width 0.1s linear; }
-#deck-area { display: flex; align-items: flex-end; gap: 8px; height: 100%; flex: 1; }
-#next-slot { width: 45px; background: rgba(0,0,0,0.3); border-radius: 10px; padding: 4px; display: flex; flex-direction: column; align-items: center; }
-.slot-label { font-size: 10px; color: #ccc; margin-bottom: 2px; }
-#hand-cards { display: flex; gap: 6px; justify-content: space-between; flex: 1; height: 100%; }
-.card { flex: 1; max-width: 85px; height: 90%; background: linear-gradient(160deg, #3d4c53, #2c3e50); border-radius: 10px; border: 2px solid #57606f; position: relative; cursor: pointer; transition: 0.1s; }
-.card.selected { transform: translateY(-12px); border-color: #f1c40f; box-shadow: 0 0 15px rgba(241,196,15,0.5); }
-.card.common { border-color: var(--common); } .card.rare { border-color: var(--rare); } .card.epic { border-color: var(--epic); } .card.legendary { border-color: var(--legendary); }
-.card-inner { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 10px; }
-.emoji { font-size: 28px; filter: drop-shadow(0 3px 2px rgba(0,0,0,0.3)); }
-.cost { position: absolute; top: -1px; left: -1px; width: 20px; height: 20px; background: #fff; color: #8854d0; border-bottom-right-radius: 10px; font-weight: 900; font-size: 12px; display: flex; align-items: center; justify-content: center; border: 2px solid #8854d0; }
-/* HUD */
-#hud-top { position: absolute; top: 0; left: 0; width: 100%; padding: 10px; display: flex; justify-content: space-between; pointer-events: none; z-index: 15; box-sizing: border-box;}
+/* 個人檔案 */
+.profile-card { background: rgba(255,255,255,0.05); margin: 20px; border-radius: 20px; padding: 30px; display: flex; flex-direction: column; align-items: center; }
+.big-avatar { width: 80px; height: 80px; background: linear-gradient(135deg, #e74c3c, #c0392b); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 40px; margin-bottom: 10px; border: 3px solid white; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; width: 100%; gap: 10px; margin-top: 20px; }
+.stat-box { background: rgba(0,0,0,0.2); border-radius: 10px; padding: 15px 10px; text-align: center; }
+.stat-box .val { font-size: 20px; font-weight: bold; margin-bottom: 5px; }
+.stat-box .label { font-size: 12px; color: #aaa; }
+
+/* 遊戲內介面 (維持原有的戰鬥區塊，但優化 UI) */
+#game-ui-wrapper { width: 100%; height: 100%; position: relative; display: flex; flex-direction: column; }
+#gameCanvas { flex: 1; display: block; width: 100%; background: #2c3e50; }
+#hud-top { position: absolute; top: 0; left: 0; width: 100%; padding: 10px; box-sizing: border-box; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
 #timer-box { background: rgba(0,0,0,0.6); padding: 5px 15px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); font-size: 24px; font-weight: 900; }
-#enemy-info { background: rgba(231, 76, 60, 0.8); padding: 6px 14px; border-radius: 12px; border: 2px solid #fff; font-weight: bold; pointer-events: auto; }
-#message { position: absolute; top: 30%; width: 100%; text-align: center; font-size: 48px; font-weight: 900; color: var(--accent); -webkit-text-stroke: 2px #000; text-shadow: 0 4px 15px rgba(0,0,0,0.6); opacity: 0; transition: 0.3s; pointer-events: none; transform: scale(0.5); }
-#message.show { opacity: 1; transform: scale(1); }
-#elixir-mode-txt { position: absolute; top: 20%; width: 100%; text-align: center; font-size: 32px; font-weight: 900; color: #e84393; text-shadow: 0 0 10px #fff; opacity: 0; transition: 0.5s; pointer-events: none; }
-#elixir-mode-txt.show { opacity: 1; transform: scale(1.5); }
-/* Emote */
-#emote-wrapper { position: absolute; bottom: 170px; left: 15px; display: flex; flex-direction: column-reverse; gap: 10px; pointer-events: auto; }
-#emote-btn { width: 44px; height: 44px; background: rgba(0,0,0,0.6); border: 2px solid #fff; border-radius: 50%; font-size: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-#emote-menu { background: rgba(0,0,0,0.8); border-radius: 12px; padding: 8px; display: none; grid-template-columns: 1fr 1fr; gap: 8px; }
-#emote-menu.open { display: grid; }
-.emote-opt { font-size: 28px; cursor: pointer; }
-.stat-row { font-size: 18px; margin: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
+#enemy-info { background: rgba(231, 76, 60, 0.9); padding: 5px 15px; border-radius: 15px; border: 2px solid white; font-weight: bold; pointer-events: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+
+#hud-bottom { height: 160px; background: var(--panel-bg); border-top: 1px solid rgba(255,255,255,0.1); padding: 5px 10px; display: flex; flex-direction: column; z-index: 10; }
+.elixir-bar-container { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; height: 30px; }
+.elixir-num { width: 32px; height: 32px; background: linear-gradient(135deg, #9b59b6, #8e44ad); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white; z-index: 2; box-shadow: 0 0 10px #9b59b6; }
+.elixir-track { flex: 1; height: 12px; background: #2d3436; border-radius: 6px; overflow: hidden; border: 1px solid #636e72; }
+#elixir-fill { height: 100%; background: linear-gradient(90deg, #d980fa, #a55eea); width: 0%; transition: width 0.1s linear; }
+.cards-container { flex: 1; display: flex; gap: 10px; }
+.next-card-slot { width: 50px; background: rgba(0,0,0,0.3); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px; }
+.next-card-slot span { font-size: 10px; color: #aaa; margin-bottom: 2px; }
+.mini-card { font-size: 24px; }
+#hand-cards { flex: 1; display: flex; justify-content: space-between; gap: 5px; }
+
+/* 戰鬥卡牌 */
+.battle-card { flex: 1; background: linear-gradient(160deg, #34495e, #2c3e50); border-radius: 8px; border: 2px solid #7f8c8d; position: relative; cursor: pointer; transition: transform 0.1s; display: flex; flex-direction: column; align-items: center; justify-content: center; max-width: 80px; box-shadow: 0 4px 0 rgba(0,0,0,0.3); }
+.battle-card.selected { transform: translateY(-15px); border-color: var(--accent); box-shadow: 0 0 15px var(--accent); z-index: 20; background: #34495e; }
+.battle-card.disabled { filter: grayscale(1) brightness(0.6); pointer-events: none; }
+.battle-card .cost { position: absolute; top: -2px; left: -2px; background: white; color: #8e44ad; width: 18px; height: 18px; border-radius: 0 0 8px 0; font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center; border: 1px solid #8e44ad; }
+.battle-card .icon { font-size: 32px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)); }
+
+/* 遊戲內控制 (表情/投降) */
+#game-controls { position: absolute; bottom: 170px; left: 10px; display: flex; flex-direction: column; gap: 10px; z-index: 20; }
+.btn-round { width: 44px; height: 44px; border-radius: 50%; border: 2px solid white; background: rgba(0,0,0,0.6); color: white; font-size: 20px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+#emote-box { position: absolute; left: 55px; bottom: 0; background: rgba(0,0,0,0.8); border-radius: 20px; padding: 10px; display: none; gap: 10px; white-space: nowrap; }
+#emote-box.show { display: flex; }
+#emote-box span { font-size: 28px; cursor: pointer; transition: transform 0.1s; }
+#emote-box span:active { transform: scale(1.2); }
+
+#msg-overlay { position: absolute; top: 40%; width: 100%; text-align: center; font-size: 40px; font-weight: 900; color: var(--accent); text-shadow: 0 2px 0 black; pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 50; }
+#elixir-mode-msg { position: absolute; top: 20%; width: 100%; text-align: center; font-size: 28px; color: #e056fd; font-weight: bold; text-shadow: 0 0 10px white; opacity: 0; transition: 0.5s; pointer-events: none; z-index: 40; }
+
+/* 結算彈窗 */
+.modal { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(5px); }
+.modal-content { background: #2c3e50; padding: 40px; border-radius: 20px; text-align: center; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.5); width: 80%; max-width: 400px; }
+#result-title { font-size: 48px; margin: 0 0 20px 0; font-style: italic; }
+#result-reward { font-size: 24px; color: var(--accent); margin-bottom: 30px; font-weight: bold; }
+
+@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
