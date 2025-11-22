@@ -17,20 +17,24 @@ const App = {
         socket.emit('login', name);
     },
     nav(page) {
-        AudioSys.play('ui');
-        document.querySelectorAll('.page').forEach(p => {
-            p.classList.remove('active');
-            p.classList.add('hidden');
-        });
-        const target = document.getElementById('page-'+page);
-        target.classList.remove('hidden');
-        setTimeout(()=>target.classList.add('active'), 10);
-
-        // 頁面初始化邏輯
-        if(page==='shop') this.renderShop();
-        if(page==='deck') this.renderDeck();
-        if(page==='leaderboard') this.renderLeaderboard();
-        if(page==='profile') this.renderProfile();
+            AudioSys.play('ui');
+    
+            // --- ★★★ 新增這一行：切換頁面時，強制關閉結算彈窗 ★★★ ---
+            document.getElementById('result-modal').classList.add('hidden');
+            document.querySelectorAll('.page').forEach(p => {
+                p.classList.remove('active');
+                p.classList.add('hidden');
+            });
+            const target = document.getElementById('page-'+page);
+            target.classList.remove('hidden');
+            setTimeout(()=>target.classList.add('active'), 10);
+    
+            // 頁面初始化邏輯
+            if(page==='shop') this.renderShop();
+            if(page==='deck') this.renderDeck();
+            if(page==='leaderboard') this.renderLeaderboard();
+            if(page==='profile') this.renderProfile();
+        },
     },
     updateUI(user) {
         userData = user;
